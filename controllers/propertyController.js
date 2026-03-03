@@ -1,0 +1,87 @@
+const Property = require('../models/Property');
+const Owner = require('../models/Owner');
+
+// @desc    Get all properties
+// @route   GET /api/properties
+// @access  Public
+exports.getProperties = async (req, res) => {
+  try {
+    const properties = await Property.findAll({
+      include: [{ model: Owner, as: 'owner' }]
+    });
+    res.json({ success: true, data: properties });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Server Error' });
+  }
+};
+
+// @desc    Get single property
+// @route   GET /api/properties/:id
+// @access  Public
+exports.getProperty = async (req, res) => {
+  try {
+    const property = await Property.findByPk(req.params.id, {
+      include: [{ model: Owner, as: 'owner' }]
+    });
+
+    if (!property) {
+      return res.status(404).json({ success: false, error: 'Property not found' });
+    }
+
+    res.json({ success: true, data: property });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Server Error' });
+  }
+};
+
+// @desc    Create new property
+// @route   POST /api/properties
+// @access  Private (Admin)
+exports.createProperty = async (req, res) => {
+  try {
+    const property = await Property.create(req.body);
+    res.status(201).json({ success: true, data: property });
+  } catch (err) {
+    if (err.name === 'SequelizeValidationError') {
+      const messages = err.errors.map(e => e.message);
+      return res.status(400).json({ success: false, error: messages });
+    }
+    res.status(500).json({ success: false, error: 'Server Error' });
+  }
+};
+
+// @desc    Update property
+// @route   PUT /api/properties/:id
+// @access  Private (Admin)
+exports.updateProperty = async (req, res) => {
+  try {
+    const property = await Property.findByPk(req.params.id);
+
+    if (!property) {
+      return res.status(404).json({ success: false, error: 'Property not found' });
+    }
+
+    await property.update(req.body);
+    res.json({ success: true, data: property });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Server Error' });
+  }
+};
+
+// @desc    Delete property
+// @route   DELETE /api/properties/:id
+// @access  Private (Admin)
+exports.deleteProperty = async (req, res) => {
+  try {
+    const property = await Property.findByPk(req.params.id);
+
+    if (!property) {
+      return res.status(404).json({ success: false, error: 'Property not found' });
+    }
+
+    await property.destroy();
+    res.json({ success: true, data: {} });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Server Error' });
+  }
+};
