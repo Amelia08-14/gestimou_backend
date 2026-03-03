@@ -1,36 +1,58 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
-const Property = require('./Property');
 
-const Financial = sequelize.define('Financial', {
+// Matches Prisma Schema:
+// model FinancialTransaction {
+//   id          Int      @id @default(autoincrement())
+//   type        String   // Charge, Dépense
+//   description String
+//   amount      Decimal
+//   status      String   // Payé, En attente
+//   date        DateTime
+//   
+//   // Relations
+//   residenceId String?
+//   residence   Residence? @relation(fields: [residenceId], references: [id])
+//   
+//   propertyId  Int?
+//   property    Property? @relation(fields: [propertyId], references: [id])
+//   
+//   createdAt   DateTime @default(now())
+//   updatedAt   DateTime @updatedAt
+// }
+
+const FinancialTransaction = sequelize.define('FinancialTransaction', {
   type: {
-    type: DataTypes.ENUM('Charge', 'Loyer', 'Autre'),
+    type: DataTypes.STRING,
     allowNull: false,
-  },
-  amount: {
-    type: DataTypes.FLOAT,
-    allowNull: false,
-  },
-  status: {
-    type: DataTypes.ENUM('Payé', 'Impayé', 'En attente'),
-    defaultValue: 'En attente',
-  },
-  dueDate: {
-    type: DataTypes.DATE,
-    allowNull: false,
-  },
-  paymentDate: {
-    type: DataTypes.DATE,
   },
   description: {
     type: DataTypes.STRING,
+    allowNull: false,
+  },
+  amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+  },
+  status: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  date: {
+    type: DataTypes.DATE,
+    allowNull: false,
+  },
+  residenceId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  propertyId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
   },
 }, {
   timestamps: true,
+  tableName: 'FinancialTransaction',
 });
 
-// Relationships
-Financial.belongsTo(Property, { foreignKey: 'propertyId', onDelete: 'CASCADE' });
-Property.hasMany(Financial, { foreignKey: 'propertyId' });
-
-module.exports = Financial;
+module.exports = FinancialTransaction;

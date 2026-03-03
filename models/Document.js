@@ -1,6 +1,17 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
+// Matches Prisma Schema:
+// model Document {
+//   id        Int      @id @default(autoincrement())
+//   name      String
+//   type      String   // PDF, DOCX
+//   size      String
+//   category  String   // Contrats, Factures, Sécurité, SAV
+//   url       String?  // Path to file
+//   createdAt DateTime @default(now())
+// }
+
 const Document = sequelize.define('Document', {
   name: {
     type: DataTypes.STRING,
@@ -10,23 +21,22 @@ const Document = sequelize.define('Document', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  url: {
+  size: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  relatedToModel: {
-    type: DataTypes.STRING, // 'Property', 'User', 'Owner', 'Maintenance'
+  category: {
+    type: DataTypes.STRING,
     allowNull: false,
   },
-  relatedToId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
+  url: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
-  uploadedBy: {
-    type: DataTypes.INTEGER, // User ID
-  }
 }, {
   timestamps: true,
+  updatedAt: false, // Prisma schema only has createdAt
+  tableName: 'Document',
 });
 
 module.exports = Document;

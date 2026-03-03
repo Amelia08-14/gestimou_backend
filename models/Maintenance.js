@@ -1,9 +1,30 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
-const Property = require('./Property');
-const User = require('./User');
 
-const Maintenance = sequelize.define('Maintenance', {
+// Matches Prisma Schema:
+// model MaintenanceTicket {
+//   id          String   @id @default(uuid()) // T-1023
+//   title       String
+//   description String   @db.Text
+//   priority    String   // Basse, Moyenne, Haute, Urgent
+//   status      String   // Signalé, En cours, Terminé
+//   category    String?  // Ascenseur, Eclairage, etc.
+//   location    String   // Parties Communes
+//   requester   String
+//   assignee    String?
+//   createdAt   DateTime @default(now())
+//   updatedAt   DateTime @updatedAt
+//   
+//   residenceId String?
+//   residence   Residence? @relation(fields: [residenceId], references: [id])
+// }
+
+const MaintenanceTicket = sequelize.define('MaintenanceTicket', {
+  id: {
+    type: DataTypes.STRING,
+    primaryKey: true,
+    defaultValue: DataTypes.UUIDV4,
+  },
   title: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -12,28 +33,37 @@ const Maintenance = sequelize.define('Maintenance', {
     type: DataTypes.TEXT,
     allowNull: false,
   },
-  status: {
-    type: DataTypes.ENUM('Signalé', 'En cours', 'Terminé', 'Annulé'),
-    defaultValue: 'Signalé',
-  },
   priority: {
-    type: DataTypes.ENUM('Basse', 'Moyenne', 'Haute', 'Urgent'),
-    defaultValue: 'Moyenne',
+    type: DataTypes.STRING,
+    allowNull: false,
   },
-  interventionDate: {
-    type: DataTypes.DATE,
+  status: {
+    type: DataTypes.STRING,
+    allowNull: false,
   },
-  cost: {
-    type: DataTypes.FLOAT,
+  category: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  location: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  requester: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  assignee: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  residenceId: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
 }, {
   timestamps: true,
+  tableName: 'MaintenanceTicket',
 });
 
-// Relationships
-Maintenance.belongsTo(Property, { foreignKey: 'propertyId' });
-Property.hasMany(Maintenance, { foreignKey: 'propertyId' });
-
-Maintenance.belongsTo(User, { as: 'requestedBy', foreignKey: 'requesterId' });
-
-module.exports = Maintenance;
+module.exports = MaintenanceTicket;

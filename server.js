@@ -6,13 +6,8 @@ const morgan = require('morgan');
 const { connectDB } = require('./config/db');
 const propertyRoutes = require('./routes/propertyRoutes');
 
-// Import Models to ensure they are registered
-require('./models/User');
-require('./models/Property');
-require('./models/Owner');
-require('./models/Financial');
-require('./models/Maintenance');
-require('./models/Document');
+// Import Models and Associations
+require('./models/index');
 
 dotenv.config();
 

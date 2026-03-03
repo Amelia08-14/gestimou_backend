@@ -1,20 +1,79 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
-const User = require('./User'); // Assuming Owner is linked to User
+
+// Matches Prisma Schema:
+// model Owner {
+//   id               Int      @id @default(autoincrement())
+//   firstName        String
+//   lastName         String
+//   email            String   @unique
+//   phone            String?
+//   address          String?
+//   status           String   @default("Actif") // Actif, Inactif
+//   avatar           String?  // Initials or URL
+//   totalChargesPaid Decimal  @default(0)
+//   
+//   // Emergency Contact
+//   emergencyContactName  String?
+//   emergencyContactPhone String?
+//   
+//   // Tracking
+//   createdBy        String?
+//   createdAt        DateTime @default(now())
+//   updatedAt        DateTime @updatedAt
+//
+//   properties       Property[]
+// }
 
 const Owner = sequelize.define('Owner', {
+  firstName: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  lastName: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  email: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+  },
+  phone: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   address: {
     type: DataTypes.STRING,
+    allowNull: true,
   },
-  // Documents can be handled via a separate table or stored as JSON if supported, 
-  // but for relational integrity, a separate Document table is better.
-  // For simplicity in Sequelize, we often use Associations.
+  status: {
+    type: DataTypes.STRING,
+    defaultValue: 'Actif',
+  },
+  avatar: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  totalChargesPaid: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  emergencyContactName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  emergencyContactPhone: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  createdBy: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 }, {
   timestamps: true,
+  tableName: 'Owner',
 });
-
-// Relationships
-Owner.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
-User.hasOne(Owner, { foreignKey: 'userId' });
 
 module.exports = Owner;

@@ -31,11 +31,11 @@ const connectDB = async () => {
     console.log('MySQL Connected...');
     
     // In production, we assume tables are managed by migrations or Prisma
-    // But for dev/demo, we can sync. Be careful with alter: true on prod data.
-    if (process.env.NODE_ENV !== 'production') {
-        // await sequelize.sync({ alter: true }); // Disabled for now to avoid altering 'gest_prod' without care
-        console.log('Database Synced...');
-    }
+    // But since we are migrating TO Sequelize, we enable sync now.
+    // Be careful with alter: true on prod data.
+    await sequelize.sync({ alter: true });
+    console.log('Database Synced...');
+    
   } catch (error) {
     console.error('Error connecting to MySQL:', error);
   }
