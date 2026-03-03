@@ -19,7 +19,7 @@ app.use(express.json());
 
 // CORS Configuration for Production
 app.use(cors({
-    origin: ['https://dev.aymenpromotion-dz.com', 'http://localhost:3000'],
+    origin: ['https://dev.aymenpromotion-dz.com', 'http://localhost:3001', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 }));
