@@ -17,12 +17,16 @@ const app = express();
 
 app.use(express.json());
 
-// CORS Configuration for Production
+// CORS Configuration for Production (Allow All Temporarily)
+app.use(cors()); // Allow all origins by default
+
+/*
 app.use(cors({
     origin: ['https://dev.aymenpromotion-dz.com', 'http://localhost:3001', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 }));
+*/
 
 app.use(helmet());
 app.use(morgan('dev'));
