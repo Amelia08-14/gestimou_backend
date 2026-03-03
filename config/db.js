@@ -3,27 +3,12 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-let sequelize;
-
-if (process.env.DATABASE_URL) {
-    console.log("Using DATABASE_URL connection string");
-    sequelize = new Sequelize(process.env.DATABASE_URL, {
-        dialect: 'mysql',
-        logging: false,
-    });
-} else {
-    console.log("Using individual DB variables");
-    sequelize = new Sequelize(
-    process.env.DB_NAME || 'gest_prod',
-    process.env.DB_USER || 'root',
-    process.env.DB_PASS || '',
-    {
-      host: process.env.DB_HOST || 'localhost',
-      dialect: 'mysql',
-      logging: false,
-    }
-  );
-}
+// Hardcoded for Production (Temporary Fix)
+let sequelize = new Sequelize('gest_prod', 'gest_user', 'GestionImmo@2026.', {
+    host: '127.0.0.1',
+    dialect: 'mysql',
+    logging: false,
+});
 
 const connectDB = async () => {
   try {
@@ -37,7 +22,9 @@ const connectDB = async () => {
     console.log('Database Synced...');
     
   } catch (error) {
-    console.error('Error connecting to MySQL:', error);
+    console.error(`Error connecting to MySQL: ${error.message}`);
+    console.error(error);
+    process.exit(1);
   }
 };
 
