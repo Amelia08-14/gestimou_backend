@@ -49,8 +49,18 @@ const connectDB = async () => {
     // In production, we assume tables are managed by migrations or Prisma
     // But since we are migrating TO Sequelize, we enable sync now.
     // Be careful with alter: true on prod data.
-    await sequelize.sync({ alter: true });
-    console.log('Database Synced...');
+    try {
+        await sequelize.sync({ alter: true });
+        console.log('Database Synced...');
+    } catch (syncError) {
+        // Ignore specific constraint error (Property_ibfk_7 does not exist) which happens when Sequelize tries to delete a non-existent constraint
+        if (syncError.name === 'SequelizeUnknownConstraintError') {
+            console.warn('⚠️ Warning: Constraint sync issue ignored (SequelizeUnknownConstraintError). The server will continue starting.');
+            console.warn(`Details: ${syncError.message}`);
+        } else {
+            throw syncError;
+        }
+    }
     
   } catch (error) {
     console.error(`Error connecting to MySQL: ${error.message}`);
