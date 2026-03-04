@@ -3,12 +3,31 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// Hardcoded for Production (Temporary Fix)
-let sequelize = new Sequelize('gest_prod', 'gest_user', 'GestionImmo@2026.', {
-    host: '127.0.0.1',
-    dialect: 'mysql',
-    logging: false,
-});
+let sequelize;
+
+// Configuration Hybride : 
+// Si on est sur Windows (Local) OU si NODE_ENV est 'development', on utilise les variables du .env local
+// Sinon (Linux/VPS/Prod), on utilise la config hardcodée pour s'assurer que ça marche
+if (process.platform === 'win32' || process.env.NODE_ENV === 'development') {
+    console.log("Using Local/Dev Database Configuration");
+    sequelize = new Sequelize(
+        process.env.DB_NAME || 'gestimou_db',
+        process.env.DB_USER || 'root',
+        process.env.DB_PASS || '',
+        {
+            host: process.env.DB_HOST || 'localhost',
+            dialect: 'mysql',
+            logging: console.log,
+        }
+    );
+} else {
+    console.log("Using Production Database Configuration (Hardcoded for VPS)");
+    sequelize = new Sequelize('gest_prod', 'gest_user', 'GestionImmo@2026.', {
+        host: '127.0.0.1',
+        dialect: 'mysql',
+        logging: false,
+    });
+}
 
 const connectDB = async () => {
   try {

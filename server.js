@@ -3,7 +3,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const { connectDB } = require('./config/db');
+const { connectDB, sequelize } = require('./config/db');
 const propertyRoutes = require('./routes/propertyRoutes');
 
 // Import Models and Associations
@@ -42,6 +42,7 @@ const userRoutes = require('./routes/userRoutes');
 const residenceRoutes = require('./routes/residenceRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const authRoutes = require('./routes/authRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 // Mount routers
 app.use('/api/properties', propertyRoutes);
@@ -52,9 +53,15 @@ app.use('/api/users', userRoutes);
 app.use('/api/residences', residenceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+sequelize.sync({ alter: true }).then(() => {
+  console.log('Database Synced...');
+  app.listen(PORT, () => {
+    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  });
+}).catch(err => {
+  console.error('Failed to sync database:', err);
 });

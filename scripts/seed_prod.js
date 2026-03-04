@@ -32,7 +32,7 @@ const seedDatabase = async () => {
         residence = await Residence.create({
             id: residenceId,
             name: 'Résidence Prestige',
-            address: 'Oran, Algérie',
+            address: 'Alger, Algérie',
             totalUnits: 40,
             deliveredUnits: 5,
             description: 'Résidence haut standing'

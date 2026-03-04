@@ -1,5 +1,4 @@
-const Property = require('../models/Property');
-const Owner = require('../models/Owner');
+const { Property, Owner } = require('../models');
 
 // @desc    Get all properties
 // @route   GET /api/properties
@@ -11,6 +10,7 @@ exports.getProperties = async (req, res) => {
     });
     res.json({ success: true, data: properties });
   } catch (err) {
+    console.error('Error fetching properties:', err);
     res.status(500).json({ success: false, error: 'Server Error' });
   }
 };
