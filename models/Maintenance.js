@@ -61,6 +61,27 @@ const MaintenanceTicket = sequelize.define('MaintenanceTicket', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  // Subcontractor Management
+  subcontractorId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
+  interventionDate: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  deadline: {
+    type: DataTypes.DATE, // Deadline for completion
+    allowNull: true,
+  },
+  cost: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+  paymentStatus: {
+    type: DataTypes.STRING, // Payé, En attente, Non facturé
+    defaultValue: 'Non facturé',
+  },
 }, {
   timestamps: true,
   tableName: 'MaintenanceTicket',

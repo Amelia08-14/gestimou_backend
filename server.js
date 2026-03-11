@@ -43,6 +43,7 @@ const residenceRoutes = require('./routes/residenceRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const authRoutes = require('./routes/authRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const registrationRoutes = require('./routes/registrationRoutes');
 
 // Mount routers
 app.use('/api/properties', propertyRoutes);
@@ -54,6 +55,7 @@ app.use('/api/residences', residenceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/registrations', registrationRoutes);
 
 const PORT = process.env.PORT || 5000;
 

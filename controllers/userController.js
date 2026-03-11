@@ -32,7 +32,7 @@ exports.getUser = async (req, res) => {
 // @route   POST /api/users
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, password, role, profession } = req.body;
+    const { name, email, password, role, profession, zone } = req.body;
     
     // Hash password
     const hashedPassword = await bcrypt.hash(password || '123456', 10);
@@ -42,7 +42,8 @@ exports.createUser = async (req, res) => {
       email,
       password: hashedPassword,
       role,
-      profession
+      profession,
+      zone
     });
     
     // Don't return password

@@ -6,8 +6,19 @@ const MaintenanceTicket = require('./Maintenance'); // Filename is Maintenance.j
 const FinancialTransaction = require('./Financial'); // Filename is Financial.js
 const Document = require('./Document');
 const Reserve = require('./Reserve');
+const Notification = require('./Notification');
+const Subcontractor = require('./Subcontractor');
+const RegistrationRequest = require('./RegistrationRequest');
+const UserDevice = require('./UserDevice');
 
 // Define Associations
+
+// User <-> UserDevice
+User.hasMany(UserDevice, { foreignKey: 'userId', as: 'devices' });
+UserDevice.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// RegistrationRequest <-> Residence (Optional, usually just ID string, but good for joins)
+// RegistrationRequest.belongsTo(Residence, { foreignKey: 'residenceId' });
 
 // Residence <-> Property
 Residence.hasMany(Property, { foreignKey: 'residenceId' });
@@ -20,6 +31,10 @@ Property.belongsTo(Owner, { foreignKey: 'ownerId', as: 'owner' });
 // Residence <-> MaintenanceTicket
 Residence.hasMany(MaintenanceTicket, { foreignKey: 'residenceId' });
 MaintenanceTicket.belongsTo(Residence, { foreignKey: 'residenceId' });
+
+// Subcontractor <-> MaintenanceTicket
+Subcontractor.hasMany(MaintenanceTicket, { foreignKey: 'subcontractorId' });
+MaintenanceTicket.belongsTo(Subcontractor, { foreignKey: 'subcontractorId', as: 'subcontractor' });
 
 // Residence <-> FinancialTransaction
 Residence.hasMany(FinancialTransaction, { foreignKey: 'residenceId' });
@@ -37,8 +52,6 @@ Property.hasMany(Reserve, { foreignKey: 'propertyId' });
 Reserve.belongsTo(Property, { foreignKey: 'propertyId' });
 
 
-const Notification = require('./Notification');
-
 // Notification Associations
 Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
@@ -53,4 +66,7 @@ module.exports = {
   Document,
   Reserve,
   Notification,
+  Subcontractor,
+  RegistrationRequest,
+  UserDevice,
 };

@@ -52,6 +52,10 @@ const Residence = sequelize.define('Residence', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  zone: {
+    type: DataTypes.STRING, // Zone 1, Zone 2, Zone 3
+    allowNull: true,
+  },
   description: {
     type: DataTypes.TEXT,
     allowNull: true,

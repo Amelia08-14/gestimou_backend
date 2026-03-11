@@ -38,6 +38,10 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  zone: {
+    type: DataTypes.STRING, // Zone 1, Zone 2, Zone 3 (Only for Zone Managers)
+    allowNull: true,
+  },
 }, {
   timestamps: true,
   tableName: 'User', // Explicit table name to match Prisma (Prisma uses pascalCase or whatever map is set, usually matches model name)

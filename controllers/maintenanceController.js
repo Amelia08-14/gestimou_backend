@@ -1,11 +1,12 @@
-const { MaintenanceTicket } = require('../models');
+const { MaintenanceTicket, Subcontractor } = require('../models');
 
 // @desc    Get all tickets
 // @route   GET /api/maintenance
 exports.getTickets = async (req, res) => {
   try {
     const tickets = await MaintenanceTicket.findAll({
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
+      include: [{ model: Subcontractor, as: 'subcontractor' }]
     });
     res.json(tickets);
   } catch (err) {
@@ -17,7 +18,9 @@ exports.getTickets = async (req, res) => {
 // @route   GET /api/maintenance/:id
 exports.getTicket = async (req, res) => {
   try {
-    const ticket = await MaintenanceTicket.findByPk(req.params.id);
+    const ticket = await MaintenanceTicket.findByPk(req.params.id, {
+      include: [{ model: Subcontractor, as: 'subcontractor' }]
+    });
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
     res.json(ticket);
   } catch (err) {

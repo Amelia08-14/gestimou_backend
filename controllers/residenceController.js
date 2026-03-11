@@ -4,7 +4,24 @@ const { Residence, Property } = require('../models');
 // @route   GET /api/residences
 exports.getResidences = async (req, res) => {
   try {
+    const where = {};
+    
+    // Role-based filtering
+    if (req.user && req.user.role === 'RESPONSABLE_ZONE') {
+      if (req.user.zone) {
+        where.zone = req.user.zone;
+      } else {
+        // If user has no zone assigned, maybe return empty or all?
+        // Ideally they should have a zone. Let's return empty to be safe.
+        // Or if we want to be lenient, return all? Safe is better.
+        // But for now, let's just log and return empty if strict.
+        // Let's assume they must have a zone.
+        where.zone = 'Unassigned'; // This will likely return nothing
+      }
+    }
+
     const residences = await Residence.findAll({
+      where,
       include: [{ model: Property }]
     });
     res.json(residences);

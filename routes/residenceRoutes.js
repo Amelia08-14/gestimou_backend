@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect, admin } = require('../middleware/authMiddleware');
 const {
   getResidences,
   getResidence,
@@ -9,12 +10,12 @@ const {
 } = require('../controllers/residenceController');
 
 router.route('/')
-  .get(getResidences)
-  .post(createResidence);
+  .get(protect, getResidences)
+  .post(protect, admin, createResidence);
 
 router.route('/:id')
-  .get(getResidence)
-  .put(updateResidence)
-  .delete(deleteResidence);
+  .get(protect, getResidence)
+  .put(protect, admin, updateResidence)
+  .delete(protect, admin, deleteResidence);
 
 module.exports = router;

@@ -1,4 +1,4 @@
-const { User } = require('../models');
+const { User, UserDevice } = require('../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 // @route   POST /api/auth/login
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, deviceId, deviceName } = req.body;
     
     // Check if user exists
     const user = await User.findOne({ where: { email } });
@@ -15,8 +15,6 @@ exports.login = async (req, res) => {
     }
     
     // Check password
-    // If user has no password (e.g. created without one?), allow login or fail?
-    // Assuming all users must have password.
     if (!user.password) {
          return res.status(401).json({ error: 'Compte non configuré' });
     }
@@ -24,6 +22,40 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ error: 'Identifiants invalides' });
+    }
+
+    // --- Device Management (For Residents) ---
+    if (user.role === 'RESIDENT' && deviceId) {
+        // Check if device is already registered
+        let device = await UserDevice.findOne({ 
+            where: { userId: user.id, deviceId } 
+        });
+
+        if (device) {
+            // Update last active
+            await device.update({ lastActive: new Date(), deviceName: deviceName || device.deviceName });
+        } else {
+            // Check limit (3 devices)
+            const deviceCount = await UserDevice.count({ where: { userId: user.id } });
+            if (deviceCount >= 3) {
+                return res.status(403).json({ 
+                    error: 'Limite d\'appareils atteinte (3/3). Veuillez contacter l\'administration pour réinitialiser vos appareils.' 
+                });
+            }
+
+            // Register new device
+            await UserDevice.create({
+                userId: user.id,
+                deviceId,
+                deviceName: deviceName || 'Unknown Device'
+            });
+        }
+    } else if (user.role === 'RESIDENT' && !deviceId) {
+        // If it's a resident logging in without deviceId (e.g. from web, if allowed, or older app version)
+        // Ideally we enforce deviceId for mobile app.
+        // For now, let's allow web login without device check if they are resident? 
+        // Or assume this is web login if no deviceId.
+        // If the requirement "application mobile... seulement sur 03 appareils" applies to mobile app only.
     }
     
     // Generate Token
