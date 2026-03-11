@@ -56,8 +56,9 @@ const connectDB = async () => {
         // Ignore specific constraint error (Property_ibfk_7 does not exist) which happens when Sequelize tries to delete a non-existent constraint
         if (syncError.name === 'SequelizeUnknownConstraintError' || 
             syncError.original?.code === 'ER_DUP_KEYNAME' || 
-            syncError.original?.code === 'ER_DUP_FIELDNAME') {
-            console.warn('⚠️ Warning: Sync issue ignored (Constraint/Index/Column). The server will continue starting.');
+            syncError.original?.code === 'ER_DUP_FIELDNAME' ||
+            syncError.original?.code === 'ER_CANT_CREATE_TABLE') { // Foreign key error
+            console.warn('⚠️ Warning: Sync issue ignored (Constraint/Index/Column/FK). The server will continue starting.');
             console.warn(`Details: ${syncError.message}`);
         } else {
             throw syncError;
