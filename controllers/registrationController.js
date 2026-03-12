@@ -7,7 +7,12 @@ const { Op } = require('sequelize');
 // @access  Public
 exports.submitRequest = async (req, res) => {
   try {
+    console.log("Registration request received:", req.body);
     const { firstName, lastName, email, phone, residenceId, block, floor, door } = req.body;
+
+    if (!firstName || !lastName || !email || !phone) {
+        return res.status(400).json({ error: 'Veuillez remplir tous les champs obligatoires (Nom, Prénom, Email, Téléphone).' });
+    }
 
     // Check if email already exists in User or Request
     const existingUser = await User.findOne({ where: { email } });
@@ -30,17 +35,18 @@ exports.submitRequest = async (req, res) => {
         lastName,
         email,
         phone,
-        residenceId,
-        block,
-        floor,
-        door
+        residenceId: residenceId || 'Non spécifié', // Fallback if residenceId is optional
+        block: block || '',
+        floor: floor || '',
+        door: door || ''
     });
 
     res.status(201).json({ message: 'Demande envoyée avec succès.', requestId: request.id });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erreur serveur lors de l\'envoi de la demande.' });
+    console.error("Error submitting registration:", err);
+    // Send clean JSON error to client instead of crashing or HTML 500
+    res.status(500).json({ error: `Erreur serveur: ${err.message}` });
   }
 };
 
