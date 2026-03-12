@@ -27,16 +27,35 @@ exports.getTickets = async (req, res) => {
         // For now simple list
     }
 
+    // Add include array construction
+    const include = [
+        { model: Subcontractor, as: 'subcontractor', required: false }
+    ];
+
+    // Check if Residence table is empty or association is valid before including
+    // For now, let's try to include Residence ONLY if we are sure it won't crash
+    // or just fetch it separately if needed.
+    // The previous error 500 likely came from "Residence" not being defined in the query context properly 
+    // or the alias mismatch despite "as: residence" being defined in index.js.
+    
+    // Let's try to fetch without Residence include first to stabilize.
+    // If we need Residence name, we can fetch it in a separate loop or fix the association.
+    
+    // In index.js we have: MaintenanceTicket.belongsTo(Residence, { foreignKey: 'residenceId', as: 'residence' });
+    // So include: { model: Residence, as: 'residence' } SHOULD work.
+    
+    // DEBUG: Let's log the attempt
+    console.log("Fetching tickets with where:", where);
+
     const tickets = await MaintenanceTicket.findAll({
       where,
       order: [['createdAt', 'DESC']],
-      include: [
-        { model: Subcontractor, as: 'subcontractor' }
-      ]
+      include: include
     });
     res.json(tickets);
   } catch (err) {
-    res.status(500).json({ error: 'Server Error' });
+    console.error("Error fetching tickets:", err); // Log the real error to console
+    res.status(500).json({ error: 'Server Error: ' + err.message }); // Send error details for debugging
   }
 };
 
@@ -46,7 +65,7 @@ exports.getTicket = async (req, res) => {
   try {
     const ticket = await MaintenanceTicket.findByPk(req.params.id, {
       include: [
-        { model: Subcontractor, as: 'subcontractor' }
+        { model: Subcontractor, as: 'subcontractor', required: false }
       ]
     });
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
