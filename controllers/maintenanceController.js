@@ -31,8 +31,7 @@ exports.getTickets = async (req, res) => {
       where,
       order: [['createdAt', 'DESC']],
       include: [
-        { model: Subcontractor, as: 'subcontractor' },
-        { model: Residence, as: 'residence', required: false } 
+        { model: Subcontractor, as: 'subcontractor' }
       ]
     });
     res.json(tickets);
@@ -47,8 +46,7 @@ exports.getTicket = async (req, res) => {
   try {
     const ticket = await MaintenanceTicket.findByPk(req.params.id, {
       include: [
-        { model: Subcontractor, as: 'subcontractor' },
-        { model: Residence, as: 'residence', required: false }
+        { model: Subcontractor, as: 'subcontractor' }
       ]
     });
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
