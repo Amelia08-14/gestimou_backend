@@ -1,6 +1,47 @@
 const { RegistrationRequest, User, Owner, Property, Residence } = require('../models');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
+const nodemailer = require('nodemailer');
+
+// Helper to send email
+const sendEmail = async (to, subject, text) => {
+    // Check if SMTP env vars are set
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.warn('⚠️ SMTP not configured. Email not sent.');
+        console.log('--- Email Content ---');
+        console.log(`To: ${to}`);
+        console.log(`Subject: ${subject}`);
+        console.log(`Body: ${text}`);
+        console.log('---------------------');
+        return;
+    }
+
+    try {
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT || 587,
+            secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS,
+            },
+            tls: {
+                rejectUnauthorized: false // Helpful for self-signed certs or some hosting providers
+            }
+        });
+
+        await transporter.sendMail({
+            from: `"GESTIMOU Support" <${process.env.SMTP_USER}>`,
+            to,
+            subject,
+            text,
+        });
+        console.log(`✅ Email sent to ${to}`);
+    } catch (error) {
+        console.error('❌ Error sending email:', error);
+        // Don't throw, just log so the request doesn't fail
+    }
+};
 
 // @desc    Submit a new registration request (Mobile App)
 // @route   POST /api/registrations
@@ -108,40 +149,60 @@ exports.approveRequest = async (req, res) => {
 
     // 3. Link Property (Optional - if property exists, link it to owner)
     // We try to find property by details provided
+    let linkedProperty = null;
     if (request.residenceId && request.block && request.door) {
         const property = await Property.findOne({
             where: {
                 residenceId: request.residenceId,
                 block: request.block,
-                lotNumber: request.door // Assuming 'door' maps to 'lotNumber' or similar
+                lotNumber: request.door
             }
         });
 
         if (property) {
             // Assign owner to property if not already assigned
-            if (!property.ownerId) {
+            // Even if already assigned, we might want to update or check? 
+            // For now, let's assume if we approve, we confirm this user owns this property.
+            if (!property.ownerId || property.ownerId !== owner.id) {
                 await property.update({ ownerId: owner.id, status: 'Vendu' });
             }
+            linkedProperty = property;
+        }
+    }
+
+    // Assign zone to user if property found (Resident inherits zone from property)
+    if (linkedProperty) {
+        // We need to fetch Residence to get the zone
+        const residence = await Residence.findByPk(linkedProperty.residenceId);
+        if (residence && residence.zone) {
+            await user.update({ zone: residence.zone });
         }
     }
 
     // 4. Update Request Status
     await request.update({ status: 'APPROVED' });
 
-    // 5. Send Email (Mock)
-    console.log(`
-    📧 EMAIL SENT TO: ${request.email}
-    Subject: Bienvenue sur Gestimou !
-    Body: 
+    // 5. Send Email
+    const emailSubject = 'Bienvenue sur Gestimou - Vos accès';
+    const emailBody = `
     Bonjour ${request.firstName},
-    Votre compte a été validé.
-    Voici vos accès :
-    Email: ${request.email}
-    Mot de passe: ${tempPassword}
-    Téléchargez l'application pour commencer.
-    `);
 
-    res.json({ message: 'Compte validé et créé avec succès.', user, tempPassword });
+    Votre demande d'inscription a été validée avec succès.
+    
+    Voici vos identifiants pour vous connecter à l'application mobile Gestimou :
+    
+    Email : ${request.email}
+    Mot de passe : ${tempPassword}
+    
+    Nous vous recommandons de changer ce mot de passe lors de votre première connexion (si cette fonctionnalité est disponible) ou de le conserver précieusement.
+    
+    Cordialement,
+    L'équipe Gestimou.
+    `;
+
+    await sendEmail(request.email, emailSubject, emailBody);
+
+    res.json({ message: 'Compte validé et créé avec succès. Email envoyé.', user, tempPassword });
 
   } catch (err) {
     console.error(err);
