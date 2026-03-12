@@ -150,23 +150,36 @@ exports.approveRequest = async (req, res) => {
     // 3. Link Property (Optional - if property exists, link it to owner)
     // We try to find property by details provided
     let linkedProperty = null;
-    if (request.residenceId && request.block && request.door) {
+    if (request.residenceId && request.door) { // Block might be empty
+        const whereClause = {
+            residenceId: request.residenceId,
+            lotNumber: request.door.trim()
+        };
+
+        // Handle block: if request.block is provided, match it. If not, match NULL or empty string.
+        if (request.block && request.block.trim() !== '') {
+            whereClause.block = request.block.trim();
+        } else {
+            // If block is not provided in request, we look for properties where block is NULL or empty
+            whereClause.block = {
+                [Op.or]: [null, '']
+            };
+        }
+
+        console.log('Searching for property with:', whereClause);
+
         const property = await Property.findOne({
-            where: {
-                residenceId: request.residenceId,
-                block: request.block,
-                lotNumber: request.door
-            }
+            where: whereClause
         });
 
         if (property) {
-            // Assign owner to property if not already assigned
-            // Even if already assigned, we might want to update or check? 
-            // For now, let's assume if we approve, we confirm this user owns this property.
-            if (!property.ownerId || property.ownerId !== owner.id) {
-                await property.update({ ownerId: owner.id, status: 'Vendu' });
-            }
+            console.log(`Property found: ${property.title} (ID: ${property.id})`);
+            // Assign owner to property
+            // We update ownerId to the new owner. 
+            await property.update({ ownerId: owner.id, status: 'Vendu' });
             linkedProperty = property;
+        } else {
+            console.warn(`No property found for Residence: ${request.residenceId}, Block: ${request.block}, Door: ${request.door}`);
         }
     }
 
