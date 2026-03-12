@@ -67,7 +67,7 @@ const MaintenanceTicket = sequelize.define('MaintenanceTicket', {
   },
   // Subcontractor Management
   subcontractorId: {
-    type: DataTypes.UUID,
+    type: DataTypes.CHAR(36), // Changed to CHAR(36) to match Subcontractor ID type if UUID
     allowNull: true,
   },
   interventionDate: {
