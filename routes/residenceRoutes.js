@@ -10,7 +10,7 @@ const {
 } = require('../controllers/residenceController');
 
 router.route('/')
-  .get(protect, getResidences)
+  .get(getResidences) // Allow public access for registration dropdown
   .post(protect, admin, createResidence);
 
 router.route('/:id')
