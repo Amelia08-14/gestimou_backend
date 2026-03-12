@@ -122,7 +122,7 @@ exports.getDashboardStats = async (req, res) => {
     const recentTickets = await MaintenanceTicket.findAll({
       limit: 5,
       order: [['createdAt', 'DESC']],
-      include: [{ model: Residence, attributes: ['name'] }]
+      include: [{ model: Residence, as: 'residence', attributes: ['name'] }]
     });
     
     const recentTransactions = await FinancialTransaction.findAll({

@@ -28,11 +28,13 @@ exports.getTickets = async (req, res) => {
     }
 
     // Add include array construction
-    const include = [];
+    const include = [
+        { model: Residence, as: 'residence', attributes: ['name'] }
+    ];
     
     // Attempt to include Subcontractor safely
     // Since Subcontractor is defined in index.js, it should work if the table exists
-    // include.push({ model: Subcontractor, as: 'subcontractor', required: false });
+    include.push({ model: Subcontractor, as: 'subcontractor', required: false });
 
     // DEBUG: Let's log the attempt
     console.log("Fetching tickets with where:", where);
@@ -40,7 +42,7 @@ exports.getTickets = async (req, res) => {
     const tickets = await MaintenanceTicket.findAll({
       where,
       order: [['createdAt', 'DESC']],
-      // include: include
+      include: include
     });
     res.json(tickets);
   } catch (err) {
