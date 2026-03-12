@@ -30,7 +30,7 @@ Property.belongsTo(Owner, { foreignKey: 'ownerId', as: 'owner' });
 
 // Residence <-> MaintenanceTicket
 Residence.hasMany(MaintenanceTicket, { foreignKey: 'residenceId' });
-MaintenanceTicket.belongsTo(Residence, { foreignKey: 'residenceId' });
+MaintenanceTicket.belongsTo(Residence, { foreignKey: 'residenceId', as: 'residence' });
 
 // Subcontractor <-> MaintenanceTicket
 Subcontractor.hasMany(MaintenanceTicket, { foreignKey: 'subcontractorId' });

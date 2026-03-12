@@ -1,4 +1,4 @@
-const { MaintenanceTicket, Subcontractor, User, Notification } = require('../models');
+const { MaintenanceTicket, Subcontractor, User, Notification, Residence } = require('../models');
 
 // @desc    Get all tickets
 // @route   GET /api/maintenance
@@ -30,7 +30,10 @@ exports.getTickets = async (req, res) => {
     const tickets = await MaintenanceTicket.findAll({
       where,
       order: [['createdAt', 'DESC']],
-      include: [{ model: Subcontractor, as: 'subcontractor' }]
+      include: [
+        { model: Subcontractor, as: 'subcontractor' },
+        { model: Residence, as: 'residence', required: false } 
+      ]
     });
     res.json(tickets);
   } catch (err) {
@@ -43,7 +46,10 @@ exports.getTickets = async (req, res) => {
 exports.getTicket = async (req, res) => {
   try {
     const ticket = await MaintenanceTicket.findByPk(req.params.id, {
-      include: [{ model: Subcontractor, as: 'subcontractor' }]
+      include: [
+        { model: Subcontractor, as: 'subcontractor' },
+        { model: Residence, as: 'residence', required: false }
+      ]
     });
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
     res.json(ticket);
