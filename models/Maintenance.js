@@ -53,6 +53,10 @@ const MaintenanceTicket = sequelize.define('MaintenanceTicket', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  email: { // Email of the requester
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   assignee: {
     type: DataTypes.STRING,
     allowNull: true,

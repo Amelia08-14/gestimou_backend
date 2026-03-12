@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect } = require('../middleware/authMiddleware');
 const {
   getTickets,
   getTicket,
@@ -9,12 +10,12 @@ const {
 } = require('../controllers/maintenanceController');
 
 router.route('/')
-  .get(getTickets)
-  .post(createTicket);
+  .get(protect, getTickets)
+  .post(protect, createTicket);
 
 router.route('/:id')
-  .get(getTicket)
-  .put(updateTicket)
-  .delete(deleteTicket);
+  .get(protect, getTicket)
+  .put(protect, updateTicket)
+  .delete(protect, deleteTicket);
 
 module.exports = router;

@@ -8,7 +8,17 @@ exports.getTickets = async (req, res) => {
     
     // Filtering for Residents: Only show their own tickets
     if (req.user && req.user.role === 'RESIDENT') {
-        where.email = req.user.email; // We match by email as tickets are linked to owner/email
+        where.email = req.user.email; 
+    }
+
+    // Filtering for Intervenants: Only show tickets assigned to them
+    if (req.user && req.user.role === 'INTERVENANT') {
+        const sub = await Subcontractor.findOne({ where: { email: req.user.email } });
+        if (sub) {
+            where.subcontractorId = sub.id;
+        } else {
+            return res.json([]); // No subcontractor profile found for this user
+        }
     }
 
     // Filtering for Zone Managers: Only show tickets for their zone
@@ -46,7 +56,13 @@ exports.getTicket = async (req, res) => {
 // @route   POST /api/maintenance
 exports.createTicket = async (req, res) => {
   try {
-    const ticket = await MaintenanceTicket.create(req.body);
+    const ticketData = {
+        ...req.body,
+        email: req.user ? req.user.email : req.body.email,
+        requester: req.user ? req.user.name : (req.body.requester || 'Anonyme')
+    };
+
+    const ticket = await MaintenanceTicket.create(ticketData);
     
     // Notification for Managers/Admins when a ticket is created
     const admins = await User.findAll({ 
