@@ -1,10 +1,24 @@
-const { Owner, Property, Residence } = require('../models');
+const { Op } = require('sequelize');
+const { Owner, Property, Residence, User } = require('../models');
 
 // @desc    Get all owners
 // @route   GET /api/owners
 exports.getOwners = async (req, res) => {
   try {
+    const where = {};
+    const onlyResidents = String(req.query.onlyResidents || '').toLowerCase();
+    if (onlyResidents === '1' || onlyResidents === 'true') {
+      const residentUsers = await User.findAll({
+        where: { role: 'RESIDENT' },
+        attributes: ['email']
+      });
+      const emails = residentUsers.map((u) => u.email).filter(Boolean);
+      if (emails.length === 0) return res.json([]);
+      where.email = { [Op.in]: emails };
+    }
+
     const owners = await Owner.findAll({
+      where,
       include: [
         { model: Property },
         { model: Residence, as: 'residence', attributes: ['id', 'name', 'zone'] }
