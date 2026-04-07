@@ -143,7 +143,11 @@ exports.submitRequest = async (req, res) => {
     res.status(201).json({ message: 'Demande envoyée avec succès.', requestId: request.id });
 
   } catch (err) {
-    console.error("Error submitting registration:", err);
+    console.error("Error submitting registration:", {
+      name: err?.name,
+      message: err?.message,
+      errors: Array.isArray(err?.errors) ? err.errors.map((e) => ({ message: e?.message, type: e?.type, path: e?.path })) : undefined
+    });
     if (err?.name === 'SequelizeUniqueConstraintError') {
       return res.status(400).json({ error: 'Une demande existe déjà pour cet email. Veuillez patienter ou contacter l’administration.' });
     }
@@ -156,7 +160,8 @@ exports.submitRequest = async (req, res) => {
     }
     const message = String(err?.message || '');
     if (message.toLowerCase().includes('validation')) {
-      return res.status(400).json({ error: 'Données invalides.' });
+      const messages = Array.isArray(err?.errors) ? err.errors.map((e) => e?.message).filter(Boolean) : [];
+      return res.status(400).json({ error: messages.length ? messages.join(' | ') : message });
     }
     res.status(500).json({ error: `Erreur serveur: ${message}` });
   }
