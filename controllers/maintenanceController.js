@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { MaintenanceTicket, Subcontractor, User, Notification, Residence } = require('../models');
 
 // @desc    Get all tickets
@@ -29,7 +30,7 @@ exports.getTickets = async (req, res) => {
 
     // Add include array construction
     const include = [
-        { model: Residence, as: 'residence', attributes: ['name'] }
+        { model: Residence, as: 'residence', attributes: ['id', 'name', 'zone'] }
     ];
     
     // Attempt to include Subcontractor safely
@@ -79,21 +80,27 @@ exports.createTicket = async (req, res) => {
 
     const ticket = await MaintenanceTicket.create(ticketData);
     
+    const residence = ticket.residenceId ? await Residence.findByPk(ticket.residenceId) : null;
+
     // Notification for Managers/Admins when a ticket is created
     const admins = await User.findAll({ 
         where: { 
-            role: ['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE'] 
+            role: { [Op.in]: ['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE'] }
         } 
     });
 
     for (const admin of admins) {
         // Skip if zone manager but different zone
-        if (admin.role === 'RESPONSABLE_ZONE' && admin.zone !== ticket.zone) continue;
+        if (admin.role === 'RESPONSABLE_ZONE') {
+          if (!admin.zone) continue;
+          if (!residence?.zone) continue;
+          if (admin.zone !== residence.zone) continue;
+        }
 
         await Notification.create({
             userId: admin.id,
             title: 'Nouveau ticket de maintenance',
-            message: `Un nouveau ticket "${ticket.subject}" a été créé pour la résidence ${ticket.residenceId}.`,
+            message: `Un nouveau ticket "${ticket.title}" a été créé pour la résidence ${ticket.residenceId || 'Non spécifiée'}.`,
             type: 'WARNING'
         });
     }
@@ -110,6 +117,24 @@ exports.updateTicket = async (req, res) => {
   try {
     const ticket = await MaintenanceTicket.findByPk(req.params.id);
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+    if (req.user?.role === 'RESIDENT') {
+      if (!ticket.email || ticket.email !== req.user.email) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+
+    if (req.user?.role === 'INTERVENANT') {
+      const allowedByName = ticket.assignee && req.user.name && ticket.assignee === req.user.name;
+      let allowedBySub = false;
+      const sub = await Subcontractor.findOne({ where: { email: req.user.email } });
+      if (sub && ticket.subcontractorId && String(ticket.subcontractorId) === String(sub.id)) {
+        allowedBySub = true;
+      }
+      if (!allowedByName && !allowedBySub) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
     
     const oldIntervenant = ticket.subcontractorId;
     await ticket.update(req.body);
@@ -143,6 +168,16 @@ exports.deleteTicket = async (req, res) => {
   try {
     const ticket = await MaintenanceTicket.findByPk(req.params.id);
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+    if (req.user?.role === 'RESIDENT') {
+      if (!ticket.email || ticket.email !== req.user.email) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+
+    if (req.user?.role === 'INTERVENANT') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     await ticket.destroy();
     res.json({ message: 'Ticket removed' });
   } catch (err) {
