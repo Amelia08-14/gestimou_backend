@@ -154,7 +154,11 @@ exports.submitRequest = async (req, res) => {
     if (err?.name && String(err.name).startsWith('Sequelize')) {
       return res.status(400).json({ error: 'Données invalides.' });
     }
-    res.status(500).json({ error: `Erreur serveur: ${err.message}` });
+    const message = String(err?.message || '');
+    if (message.toLowerCase().includes('validation')) {
+      return res.status(400).json({ error: 'Données invalides.' });
+    }
+    res.status(500).json({ error: `Erreur serveur: ${message}` });
   }
 };
 
