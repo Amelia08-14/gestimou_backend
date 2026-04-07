@@ -3,7 +3,40 @@ const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const nodemailer = require('nodemailer');
 
-// Helper to send email
+let cachedTransporter = null;
+let cachedTransporterKey = null;
+
+const getTransporter = () => {
+    const host = process.env.SMTP_HOST;
+    const port = Number(process.env.SMTP_PORT || 587);
+    const secure = process.env.SMTP_SECURE === 'true';
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const tlsRejectUnauthorized = process.env.SMTP_TLS_REJECT_UNAUTHORIZED !== 'false';
+    const debug = process.env.SMTP_DEBUG === 'true';
+
+    const key = `${host}|${port}|${secure}|${user}|${tlsRejectUnauthorized}|${debug}`;
+    if (cachedTransporter && cachedTransporterKey === key) return cachedTransporter;
+
+    cachedTransporterKey = key;
+    cachedTransporter = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: {
+            user,
+            pass,
+        },
+        tls: {
+            rejectUnauthorized: tlsRejectUnauthorized
+        },
+        logger: debug,
+        debug
+    });
+
+    return cachedTransporter;
+};
+
 const sendEmail = async (to, subject, text) => {
     // Check if SMTP env vars are set
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
@@ -17,28 +50,38 @@ const sendEmail = async (to, subject, text) => {
     }
 
     try {
-        const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: process.env.SMTP_PORT || 587,
-            secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-            },
-            tls: {
-                rejectUnauthorized: false // Helpful for self-signed certs or some hosting providers
-            }
-        });
+        const transporter = getTransporter();
 
-        await transporter.sendMail({
-            from: `"GESTIMOU Support" <${process.env.SMTP_USER}>`,
+        const fromEmail = process.env.MAIL_FROM || process.env.SMTP_USER;
+        const fromName = process.env.MAIL_FROM_NAME || 'GESTIMOU Support';
+        const replyTo = process.env.MAIL_REPLY_TO || fromEmail;
+        const envelopeFrom = process.env.MAIL_ENVELOPE_FROM || fromEmail;
+
+        const info = await transporter.sendMail({
+            from: `"${fromName}" <${fromEmail}>`,
             to,
             subject,
             text,
+            replyTo,
+            envelope: { from: envelopeFrom, to },
         });
-        console.log(`✅ Email sent to ${to}`);
+        console.log('✅ Email sent', {
+            to,
+            messageId: info?.messageId,
+            accepted: info?.accepted,
+            rejected: info?.rejected,
+            response: info?.response
+        });
     } catch (error) {
-        console.error('❌ Error sending email:', error);
+        console.error('❌ Error sending email', {
+            to,
+            message: error?.message,
+            code: error?.code,
+            command: error?.command,
+            responseCode: error?.responseCode,
+            response: error?.response,
+            rejected: error?.rejected
+        });
         // Don't throw, just log so the request doesn't fail
     }
 };
