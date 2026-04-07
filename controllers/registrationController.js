@@ -94,38 +94,45 @@ exports.submitRequest = async (req, res) => {
     console.log("Registration request received:", req.body);
     const { firstName, lastName, email, phone, residenceId, block, floor, door } = req.body;
 
-    if (!firstName || !lastName || !email || !phone) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedFirstName = String(firstName || '').trim();
+    const normalizedLastName = String(lastName || '').trim();
+    const normalizedPhone = String(phone || '').trim();
+    const normalizedResidenceId = String(residenceId || '').trim();
+
+    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedPhone) {
         return res.status(400).json({ error: 'Veuillez remplir tous les champs obligatoires (Nom, Prénom, Email, Téléphone).' });
     }
 
     // Check if email already exists in User or Request
-    const existingUser = await User.findOne({ where: { email } });
+    const existingUser = await User.findOne({ where: { email: normalizedEmail } });
     if (existingUser) {
         return res.status(400).json({ error: 'Un compte existe déjà avec cet email.' });
     }
 
     const existingRequest = await RegistrationRequest.findOne({ 
         where: { 
-            email, 
+            email: normalizedEmail, 
             status: 'PENDING' 
         } 
     });
-    if (existingRequest) {
-        return res.status(400).json({ error: 'Une demande est déjà en cours de traitement pour cet email.' });
-    }
-
     const payload = {
-        firstName,
-        lastName,
-        email,
-        phone,
-        residenceId: residenceId || 'Non spécifié',
-        block: block || '',
-        floor: floor || '',
-        door: door || ''
+        firstName: normalizedFirstName,
+        lastName: normalizedLastName,
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        residenceId: normalizedResidenceId || 'Non spécifié',
+        block: String(block || '').trim(),
+        floor: String(floor || '').trim(),
+        door: String(door || '').trim()
     };
 
-    const existingAny = await RegistrationRequest.findOne({ where: { email } });
+    if (existingRequest) {
+        await existingRequest.update(payload);
+        return res.status(201).json({ message: 'Demande envoyée avec succès.', requestId: existingRequest.id });
+    }
+
+    const existingAny = await RegistrationRequest.findOne({ where: { email: normalizedEmail } });
     if (existingAny) {
         await existingAny.update({ ...payload, status: 'PENDING' });
         return res.status(201).json({ message: 'Demande envoyée avec succès.', requestId: existingAny.id });
@@ -143,6 +150,9 @@ exports.submitRequest = async (req, res) => {
     if (err?.name === 'SequelizeValidationError') {
       const messages = Array.isArray(err.errors) ? err.errors.map((e) => e.message).filter(Boolean) : [];
       return res.status(400).json({ error: messages.length ? messages.join(' | ') : 'Données invalides.' });
+    }
+    if (err?.name && String(err.name).startsWith('Sequelize')) {
+      return res.status(400).json({ error: 'Données invalides.' });
     }
     res.status(500).json({ error: `Erreur serveur: ${err.message}` });
   }
