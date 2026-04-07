@@ -7,11 +7,11 @@ exports.getTransactions = async (req, res) => {
   try {
     const transactions = await FinancialTransaction.findAll({
       include: [
-        { model: Residence, attributes: ['name'] },
+        { model: Residence, attributes: ['id', 'name', 'zone'] },
         { 
           model: Property,
-          as: 'property', // Explicit lowercase alias
-          attributes: ['title', 'lotNumber'],
+          as: 'property',
+          attributes: ['id', 'title', 'lotNumber', 'block', 'floor', 'status'],
           include: [{ model: Owner, as: 'owner', attributes: ['firstName', 'lastName'] }]
         }
       ],
@@ -28,44 +28,39 @@ exports.getTransactions = async (req, res) => {
 // @route   POST /api/financial/generate-charges
 exports.generateMonthlyCharges = async (req, res) => {
   try {
-    const { month, year, amount } = req.body; // e.g., 3, 2026, 15000
+    const { month, year, amount } = req.body;
     
     // Find all properties
     const properties = await Property.findAll();
     const createdCharges = [];
     
     for (const property of properties) {
-        // Define date range for the specified month
-        // month is 1-12
         const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0); // Last day of month
+        const endDate = new Date(year, month, 0);
         
-        // Check if charge already exists
         const existing = await FinancialTransaction.findOne({
             where: {
                 propertyId: property.id,
                 type: 'Charge',
-                date: {
+                periodStart: {
                     [Op.between]: [startDate, endDate]
                 }
             }
         });
         
         if (!existing) {
-            // Determine default amount based on property type or size if needed
-            // For now use provided amount or default 15000
-            const chargeAmount = amount || 15000;
-            
-            // Format description
+            const chargeAmount = Number(amount || property.price || 15000);
             const monthName = new Date(year, month - 1, 1).toLocaleString('fr-FR', { month: 'long' });
-            const description = `Charges Copropriété - ${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
+            const description = `Charge gestion - ${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
             
             const charge = await FinancialTransaction.create({
                 type: 'Charge',
                 description: description,
                 amount: chargeAmount,
                 status: 'Impayé',
-                date: new Date(year, month - 1, 5), // Due date 5th of month
+                date: new Date(year, month - 1, 5),
+                periodStart: startDate,
+                periodEnd: endDate,
                 propertyId: property.id,
                 residenceId: property.residenceId
             });

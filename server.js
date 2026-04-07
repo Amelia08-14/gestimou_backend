@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -15,21 +16,47 @@ connectDB();
 
 const app = express();
 
-app.use(express.json());
+const corsOptions = {
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
 
-// CORS Configuration for Production (Allow All Temporarily)
-app.use(cors()); // Allow all origins by default
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
-/*
-app.use(cors({
-    origin: ['https://dev.aymenpromotion-dz.com', 'http://localhost:3001', 'http://localhost:3000'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
-}));
-*/
-
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: true, limit: '500mb' }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(morgan('dev'));
+
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+
+    return res.status(413).json({ error: 'Payload Too Large' });
+  }
+
+  if (err && err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'File too large' });
+    }
+    return res.status(400).json({ error: 'Upload error' });
+  }
+
+  if (err && err.message === 'Unsupported file type') {
+    return res.status(400).json({ error: 'Unsupported file type' });
+  }
+
+  return next(err);
+});
 
 app.get('/', (req, res) => {
   res.send('API is running...');
@@ -44,6 +71,8 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const authRoutes = require('./routes/authRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const registrationRoutes = require('./routes/registrationRoutes');
+const documentRoutes = require('./routes/documentRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 // Mount routers
 app.use('/api/properties', propertyRoutes);
@@ -56,6 +85,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/registrations', registrationRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/admin', adminRoutes);
 
 const PORT = process.env.PORT || 5000;
 

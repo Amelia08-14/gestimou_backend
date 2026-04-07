@@ -29,6 +29,10 @@ const Document = sequelize.define('Document', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  residenceId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   url: {
     type: DataTypes.STRING,
     allowNull: true,

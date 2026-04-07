@@ -6,7 +6,8 @@ const {
   getResidence,
   createResidence,
   updateResidence,
-  deleteResidence
+  deleteResidence,
+  uploadResidenceMedia
 } = require('../controllers/residenceController');
 
 router.route('/')
@@ -17,5 +18,8 @@ router.route('/:id')
   .get(protect, getResidence)
   .put(protect, admin, updateResidence)
   .delete(protect, admin, deleteResidence);
+
+router.route('/:id/upload')
+  .post(protect, admin, uploadResidenceMedia);
 
 module.exports = router;

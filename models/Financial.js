@@ -42,6 +42,14 @@ const FinancialTransaction = sequelize.define('FinancialTransaction', {
     type: DataTypes.DATE,
     allowNull: false,
   },
+  periodStart: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  periodEnd: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
   residenceId: {
     type: DataTypes.STRING,
     allowNull: true,

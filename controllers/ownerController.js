@@ -1,4 +1,4 @@
-const { Owner, Property } = require('../models');
+const { Owner, Property, Residence } = require('../models');
 
 // @desc    Get all owners
 // @route   GET /api/owners
@@ -6,7 +6,8 @@ exports.getOwners = async (req, res) => {
   try {
     const owners = await Owner.findAll({
       include: [
-        { model: Property }
+        { model: Property },
+        { model: Residence, as: 'residence', attributes: ['id', 'name', 'zone'] }
       ],
       order: [['lastName', 'ASC']]
     });
@@ -30,14 +31,16 @@ exports.getOwners = async (req, res) => {
 exports.getOwner = async (req, res) => {
   try {
     const owner = await Owner.findByPk(req.params.id, {
-      include: [{ model: Property }]
+      include: [
+        { model: Property },
+        { model: Residence, as: 'residence', attributes: ['id', 'name', 'zone'] }
+      ]
     });
     
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
     
     const ownerJson = owner.toJSON();
     ownerJson.propertiesCount = owner.Properties ? owner.Properties.length : 0;
-    // Map properties key to match frontend expectation (lowercase) if needed
     ownerJson.properties = owner.Properties;
 
     res.json(ownerJson);

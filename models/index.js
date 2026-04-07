@@ -28,13 +28,17 @@ Property.belongsTo(Residence, { foreignKey: 'residenceId' });
 Owner.hasMany(Property, { foreignKey: 'ownerId' });
 Property.belongsTo(Owner, { foreignKey: 'ownerId', as: 'owner' });
 
+// Residence <-> Owner
+Residence.hasMany(Owner, { foreignKey: 'residenceId', as: 'owners' });
+Owner.belongsTo(Residence, { foreignKey: 'residenceId', as: 'residence' });
+
 // Residence <-> MaintenanceTicket
 Residence.hasMany(MaintenanceTicket, { foreignKey: 'residenceId' });
 MaintenanceTicket.belongsTo(Residence, { foreignKey: 'residenceId', as: 'residence' });
 
 // Subcontractor <-> MaintenanceTicket
-Subcontractor.hasMany(MaintenanceTicket, { foreignKey: 'subcontractorId' });
-MaintenanceTicket.belongsTo(Subcontractor, { foreignKey: 'subcontractorId', as: 'subcontractor' });
+Subcontractor.hasMany(MaintenanceTicket, { foreignKey: 'subcontractorId', constraints: false });
+MaintenanceTicket.belongsTo(Subcontractor, { foreignKey: 'subcontractorId', as: 'subcontractor', constraints: false });
 
 // Residence <-> FinancialTransaction
 Residence.hasMany(FinancialTransaction, { foreignKey: 'residenceId' });
@@ -55,6 +59,10 @@ Reserve.belongsTo(Property, { foreignKey: 'propertyId' });
 // Notification Associations
 Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
+
+// Residence <-> Document
+Residence.hasMany(Document, { foreignKey: 'residenceId' });
+Document.belongsTo(Residence, { foreignKey: 'residenceId' });
 
 module.exports = {
   User,

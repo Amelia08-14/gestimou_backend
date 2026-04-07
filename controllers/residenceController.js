@@ -1,4 +1,24 @@
 const { Residence, Property } = require('../models');
+const fs = require('fs');
+const path = require('path');
+
+const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const parseDataUrl = (dataUrl) => {
+  if (typeof dataUrl !== 'string') return null;
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return null;
+  const mimeType = match[1];
+  const base64Data = match[2];
+  return { mimeType, base64Data };
+};
+
+const extFromMimeType = (mimeType) => {
+  if (mimeType === 'image/jpeg') return 'jpg';
+  if (mimeType === 'image/png') return 'png';
+  if (mimeType === 'image/webp') return 'webp';
+  return null;
+};
 
 // @desc    Get all residences
 // @route   GET /api/residences
@@ -77,6 +97,53 @@ exports.deleteResidence = async (req, res) => {
     if (!residence) return res.status(404).json({ error: 'Residence not found' });
     await residence.destroy();
     res.json({ message: 'Residence removed' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Upload residence logo or cover image
+// @route   POST /api/residences/:id/upload
+exports.uploadResidenceMedia = async (req, res) => {
+  try {
+    const residence = await Residence.findByPk(req.params.id);
+    if (!residence) return res.status(404).json({ error: 'Residence not found' });
+
+    const { type, dataUrl } = req.body || {};
+    if (type !== 'logo' && type !== 'image') {
+      return res.status(400).json({ error: 'Invalid type' });
+    }
+
+    const parsed = parseDataUrl(dataUrl);
+    if (!parsed) {
+      return res.status(400).json({ error: 'Invalid image data' });
+    }
+
+    if (!allowedMimeTypes.has(parsed.mimeType)) {
+      return res.status(400).json({ error: 'Unsupported image type' });
+    }
+
+    const ext = extFromMimeType(parsed.mimeType);
+    if (!ext) {
+      return res.status(400).json({ error: 'Unsupported image type' });
+    }
+
+    const buffer = Buffer.from(parsed.base64Data, 'base64');
+    if (buffer.length > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Image too large (max 5MB)' });
+    }
+
+    const uploadsDir = path.join(__dirname, '..', 'uploads', 'residences');
+    await fs.promises.mkdir(uploadsDir, { recursive: true });
+
+    const filename = `${residence.id}-${type}-${Date.now()}.${ext}`;
+    const filePath = path.join(uploadsDir, filename);
+    await fs.promises.writeFile(filePath, buffer);
+
+    const publicPath = `/uploads/residences/${filename}`;
+    await residence.update({ [type]: publicPath });
+
+    res.json({ url: publicPath });
   } catch (err) {
     res.status(500).json({ error: 'Server Error' });
   }

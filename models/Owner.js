@@ -43,6 +43,26 @@ const Owner = sequelize.define('Owner', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  residenceId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  block: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  floor: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  doorNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  parkingNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   address: {
     type: DataTypes.STRING,
     allowNull: true,
