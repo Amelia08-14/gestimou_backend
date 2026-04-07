@@ -46,23 +46,28 @@ const connectDB = async () => {
     await sequelize.authenticate();
     console.log('MySQL Connected...');
     
-    // In production, we assume tables are managed by migrations or Prisma
-    // But since we are migrating TO Sequelize, we enable sync now.
-    // Be careful with alter: true on prod data.
-    try {
+    const shouldSync =
+      process.env.DB_SYNC === 'true' ||
+      process.env.SYNC_DB === 'true' ||
+      process.env.NODE_ENV !== 'production';
+
+    if (shouldSync) {
+      try {
         await sequelize.sync({ alter: true });
         console.log('Database Synced...');
-    } catch (syncError) {
-        // Ignore specific constraint error (Property_ibfk_7 does not exist) which happens when Sequelize tries to delete a non-existent constraint
-        if (syncError.name === 'SequelizeUnknownConstraintError' || 
-            syncError.original?.code === 'ER_DUP_KEYNAME' || 
+      } catch (syncError) {
+        if (syncError.name === 'SequelizeUnknownConstraintError' ||
+            syncError.original?.code === 'ER_DUP_KEYNAME' ||
             syncError.original?.code === 'ER_DUP_FIELDNAME' ||
-            syncError.original?.code === 'ER_CANT_CREATE_TABLE') { // Foreign key error
-            console.warn('⚠️ Warning: Sync issue ignored (Constraint/Index/Column/FK). The server will continue starting.');
-            console.warn(`Details: ${syncError.message}`);
+            syncError.original?.code === 'ER_CANT_CREATE_TABLE') {
+          console.warn('⚠️ Warning: Sync issue ignored (Constraint/Index/Column/FK). The server will continue starting.');
+          console.warn(`Details: ${syncError.message}`);
         } else {
-            throw syncError;
+          throw syncError;
         }
+      }
+    } else {
+      console.log('Database Sync skipped (production mode).');
     }
     
   } catch (error) {
