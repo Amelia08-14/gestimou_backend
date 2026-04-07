@@ -114,22 +114,36 @@ exports.submitRequest = async (req, res) => {
         return res.status(400).json({ error: 'Une demande est déjà en cours de traitement pour cet email.' });
     }
 
-    const request = await RegistrationRequest.create({
+    const payload = {
         firstName,
         lastName,
         email,
         phone,
-        residenceId: residenceId || 'Non spécifié', // Fallback if residenceId is optional
+        residenceId: residenceId || 'Non spécifié',
         block: block || '',
         floor: floor || '',
         door: door || ''
-    });
+    };
+
+    const existingAny = await RegistrationRequest.findOne({ where: { email } });
+    if (existingAny) {
+        await existingAny.update({ ...payload, status: 'PENDING' });
+        return res.status(201).json({ message: 'Demande envoyée avec succès.', requestId: existingAny.id });
+    }
+
+    const request = await RegistrationRequest.create(payload);
 
     res.status(201).json({ message: 'Demande envoyée avec succès.', requestId: request.id });
 
   } catch (err) {
     console.error("Error submitting registration:", err);
-    // Send clean JSON error to client instead of crashing or HTML 500
+    if (err?.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ error: 'Une demande existe déjà pour cet email. Veuillez patienter ou contacter l’administration.' });
+    }
+    if (err?.name === 'SequelizeValidationError') {
+      const messages = Array.isArray(err.errors) ? err.errors.map((e) => e.message).filter(Boolean) : [];
+      return res.status(400).json({ error: messages.length ? messages.join(' | ') : 'Données invalides.' });
+    }
     res.status(500).json({ error: `Erreur serveur: ${err.message}` });
   }
 };
