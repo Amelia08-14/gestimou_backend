@@ -9,6 +9,7 @@
     "backfill:residence-zones": "node scripts/backfill_residence_zones.js",
     "seed:residences-zones": "node scripts/seed_residences_from_zones.js",
     "seed:residences-demo": "node scripts/seed_residence_demo_data.js",
+    "seed:properties-demo": "node scripts/seed_properties_demo_data.js",
     "seed:prestataires-expenses": "node scripts/seed_subcontractors_and_expenses.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
