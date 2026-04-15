@@ -48,6 +48,10 @@ FinancialTransaction.belongsTo(Residence, { foreignKey: 'residenceId' });
 Property.hasMany(FinancialTransaction, { foreignKey: 'propertyId' });
 FinancialTransaction.belongsTo(Property, { foreignKey: 'propertyId', as: 'property' });
 
+// Document <-> FinancialTransaction
+Document.hasMany(FinancialTransaction, { foreignKey: 'documentId' });
+FinancialTransaction.belongsTo(Document, { foreignKey: 'documentId', as: 'document' });
+
 // Owner <-> Property (Nested for Financial)
 // Already defined above
 

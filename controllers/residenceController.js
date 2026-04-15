@@ -29,10 +29,11 @@ exports.getResidences = async (req, res) => {
     // Role-based filtering
     if (req.user) {
         if (req.user.role === 'RESPONSABLE_ZONE') {
-            if (req.user.zone) {
-                where.zone = req.user.zone;
-            } else {
-                where.zone = 'Unassigned';
+            const zone = String(req.user.zone || '').trim();
+            if (!zone) {
+              where.zone = 'Unassigned';
+            } else if (zone.toUpperCase() !== 'ALL') {
+              where.zone = zone;
             }
         }
     } else {

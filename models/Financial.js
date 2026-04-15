@@ -58,6 +58,14 @@ const FinancialTransaction = sequelize.define('FinancialTransaction', {
     type: DataTypes.INTEGER,
     allowNull: true,
   },
+  expenseCategory: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  documentId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 }, {
   timestamps: true,
   tableName: 'FinancialTransaction',

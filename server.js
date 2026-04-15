@@ -73,6 +73,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const registrationRoutes = require('./routes/registrationRoutes');
 const documentRoutes = require('./routes/documentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const { startAnnualChargesScheduler } = require('./jobs/annualChargesScheduler');
 
 // Mount routers
 app.use('/api/properties', propertyRoutes);
@@ -95,6 +96,7 @@ const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   });
+  startAnnualChargesScheduler();
 })().catch((err) => {
   console.error('Failed to start server:', err?.message || err);
   process.exit(1);

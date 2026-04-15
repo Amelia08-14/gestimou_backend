@@ -1,5 +1,94 @@
-const { FinancialTransaction, Property, Residence, Owner } = require('../models');
+const { FinancialTransaction, Property, Residence, Owner, User, Notification, Document } = require('../models');
 const { Op } = require('sequelize');
+
+const computeAnnualPeriod = (year) => {
+  const periodStart = new Date(year, 0, 1);
+  periodStart.setHours(0, 0, 0, 0);
+  const periodEnd = new Date(year, 11, 31);
+  periodEnd.setHours(23, 59, 59, 999);
+  const generationStart = new Date(periodEnd);
+  generationStart.setMonth(generationStart.getMonth() - 3);
+  generationStart.setHours(0, 0, 0, 0);
+  return { periodStart, periodEnd, generationStart };
+};
+
+const generateAnnualChargesInternal = async ({ year, amount, force = false, now = new Date() } = {}) => {
+  const safeYear = Number(year || now.getFullYear());
+  const { periodStart, periodEnd, generationStart } = computeAnnualPeriod(safeYear);
+
+  if (!force && now < generationStart) {
+    return { skipped: true, reason: 'too_early', created: 0, notified: 0, year: safeYear };
+  }
+
+  const [properties, residences] = await Promise.all([
+    Property.findAll({
+      include: [{ model: Owner, as: 'owner', required: false, attributes: ['id', 'email', 'firstName', 'lastName'] }]
+    }),
+    Residence.findAll({ attributes: ['id', 'name', 'zone'] })
+  ]);
+
+  const residenceById = new Map(residences.map((r) => [r.id, r]));
+
+  let created = 0;
+  let notified = 0;
+
+  for (const property of properties) {
+    const startWindowEnd = new Date(periodStart);
+    startWindowEnd.setDate(startWindowEnd.getDate() + 1);
+    const endWindowStart = new Date(periodEnd);
+    endWindowStart.setDate(endWindowStart.getDate() - 1);
+
+    const existing = await FinancialTransaction.findOne({
+      where: {
+        propertyId: property.id,
+        type: 'Charge',
+        periodStart: { [Op.between]: [periodStart, startWindowEnd] },
+        periodEnd: { [Op.between]: [endWindowStart, periodEnd] }
+      }
+    });
+
+    if (existing) continue;
+
+    const chargeAmount = Number(amount || property.price || 15000);
+    const residence = residenceById.get(property.residenceId);
+    const residenceName = residence?.name || property.residenceId || '';
+    const description = `Charge gestion - Année ${safeYear}`;
+
+    const charge = await FinancialTransaction.create({
+      type: 'Charge',
+      description,
+      amount: chargeAmount,
+      status: 'Impayé',
+      date: now,
+      periodStart,
+      periodEnd,
+      propertyId: property.id,
+      residenceId: property.residenceId
+    });
+
+    created += 1;
+
+    const ownerEmail = property.owner?.email;
+    if (ownerEmail) {
+      const user = await User.findOne({ where: { email: String(ownerEmail).toLowerCase() } });
+      if (user) {
+        await Notification.create({
+          userId: user.id,
+          title: 'Charge annuelle',
+          message: `Votre charge annuelle ${safeYear} a été générée pour ${residenceName} (${property.title}). Montant: ${chargeAmount} DA. Échéance: ${periodEnd.toLocaleDateString('fr-FR')}.`,
+          type: 'WARNING'
+        });
+        notified += 1;
+      }
+    }
+
+    if (force && charge) {
+      continue;
+    }
+  }
+
+  return { skipped: false, created, notified, year: safeYear };
+};
 
 // @desc    Get all transactions
 // @route   GET /api/financial
@@ -13,6 +102,11 @@ exports.getTransactions = async (req, res) => {
           as: 'property',
           attributes: ['id', 'title', 'lotNumber', 'block', 'floor', 'status'],
           include: [{ model: Owner, as: 'owner', attributes: ['firstName', 'lastName'] }]
+        },
+        {
+          model: Document,
+          as: 'document',
+          attributes: ['id', 'name', 'category', 'type', 'size', 'url', 'createdAt']
         }
       ],
       order: [['date', 'DESC']]
@@ -24,53 +118,19 @@ exports.getTransactions = async (req, res) => {
   }
 };
 
-// @desc    Generate monthly charges for all properties
+// @desc    Generate annual charges for all properties (3 months before deadline)
 // @route   POST /api/financial/generate-charges
-exports.generateMonthlyCharges = async (req, res) => {
+exports.generateAnnualCharges = async (req, res) => {
   try {
-    const { month, year, amount } = req.body;
-    
-    // Find all properties
-    const properties = await Property.findAll();
-    const createdCharges = [];
-    
-    for (const property of properties) {
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0);
-        
-        const existing = await FinancialTransaction.findOne({
-            where: {
-                propertyId: property.id,
-                type: 'Charge',
-                periodStart: {
-                    [Op.between]: [startDate, endDate]
-                }
-            }
-        });
-        
-        if (!existing) {
-            const chargeAmount = Number(amount || property.price || 15000);
-            const monthName = new Date(year, month - 1, 1).toLocaleString('fr-FR', { month: 'long' });
-            const description = `Charge gestion - ${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
-            
-            const charge = await FinancialTransaction.create({
-                type: 'Charge',
-                description: description,
-                amount: chargeAmount,
-                status: 'Impayé',
-                date: new Date(year, month - 1, 5),
-                periodStart: startDate,
-                periodEnd: endDate,
-                propertyId: property.id,
-                residenceId: property.residenceId
-            });
-            createdCharges.push(charge);
-        }
+    const { year, amount, force } = req.body || {};
+    const result = await generateAnnualChargesInternal({ year, amount, force: Boolean(force), now: new Date() });
+    if (result.skipped) {
+      return res.json({ message: `Trop tôt pour générer les charges annuelles ${result.year}.`, ...result });
     }
-    
-    res.json({ 
-        message: `Generated ${createdCharges.length} charges for ${properties.length} properties.`, 
-        count: createdCharges.length 
+
+    res.json({
+      message: `Charges annuelles générées: ${result.created}. Notifications: ${result.notified}.`,
+      ...result
     });
     
   } catch (err) {
@@ -78,6 +138,9 @@ exports.generateMonthlyCharges = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+exports.generateMonthlyCharges = exports.generateAnnualCharges;
+exports.generateAnnualChargesInternal = generateAnnualChargesInternal;
 
 // @desc    Get single transaction
 // @route   GET /api/financial/:id

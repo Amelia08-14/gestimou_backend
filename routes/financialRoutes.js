@@ -6,7 +6,7 @@ const {
   createTransaction,
   updateTransaction,
   deleteTransaction,
-  generateMonthlyCharges
+  generateAnnualCharges
 } = require('../controllers/financialController');
 
 console.log('Loading financial routes...');
@@ -14,7 +14,7 @@ console.log('Loading financial routes...');
 router.post('/generate-charges', (req, res, next) => {
     console.log('Hit /generate-charges');
     next();
-}, generateMonthlyCharges);
+}, generateAnnualCharges);
 
 router.route('/')
   .get(getTransactions)
