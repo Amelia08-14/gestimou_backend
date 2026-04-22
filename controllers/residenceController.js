@@ -28,6 +28,9 @@ exports.getResidences = async (req, res) => {
     
     // Role-based filtering
     if (req.user) {
+        if (req.user.role === 'RECOUVREMENT') {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
         if (req.user.role === 'RESIDENT') {
             const owner = await Owner.findOne({ where: { email: req.user.email } });
             if (!owner || !owner.residenceId) return res.json([]);
@@ -61,6 +64,9 @@ exports.getResidences = async (req, res) => {
 // @route   GET /api/residences/:id
 exports.getResidence = async (req, res) => {
   try {
+    if (req.user?.role === 'RECOUVREMENT') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     if (req.user?.role === 'RESIDENT') {
       const owner = await Owner.findOne({ where: { email: req.user.email } });
       if (!owner || !owner.residenceId || String(owner.residenceId) !== String(req.params.id)) {

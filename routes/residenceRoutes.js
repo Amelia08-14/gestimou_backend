@@ -15,7 +15,7 @@ router.route('/')
   .post(protect, admin, createResidence);
 
 router.route('/:id')
-  .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'HSE', 'INTERVENANT', 'RECOUVREMENT', 'RESIDENT'), getResidence)
+  .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'HSE', 'INTERVENANT', 'RESIDENT'), getResidence)
   .put(protect, admin, updateResidence)
   .delete(protect, admin, deleteResidence);
 

@@ -5,6 +5,6 @@ const {
   getDashboardStats
 } = require('../controllers/dashboardController');
 
-router.route('/').get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT', 'MANAGER', 'HSE', 'INTERVENANT', 'RESIDENT'), getDashboardStats);
+router.route('/').get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'HSE', 'INTERVENANT', 'RESIDENT'), getDashboardStats);
 
 module.exports = router;

@@ -10,7 +10,7 @@ const {
 } = require('../controllers/userController');
 
 router.route('/')
-  .get(protect, authorizeRoles('ADMIN', 'MANAGER'), getUsers)
+  .get(protect, authorizeRoles('ADMIN'), getUsers)
   .post(protect, authorizeRoles('ADMIN'), createUser);
 
 router.route('/:id')

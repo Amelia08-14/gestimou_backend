@@ -10,15 +10,15 @@ const {
   generateAnnualCharges
 } = require('../controllers/financialController');
 
-router.post('/generate-charges', protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), generateAnnualCharges);
+router.post('/generate-charges', protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), generateAnnualCharges);
 
 router.route('/')
-  .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), getTransactions)
-  .post(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), createTransaction);
+  .get(protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), getTransactions)
+  .post(protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), createTransaction);
 
 router.route('/:id')
-  .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), getTransaction)
-  .put(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), updateTransaction)
-  .delete(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), deleteTransaction);
+  .get(protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), getTransaction)
+  .put(protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), updateTransaction)
+  .delete(protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), deleteTransaction);
 
 module.exports = router;
