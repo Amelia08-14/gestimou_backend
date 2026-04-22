@@ -1,4 +1,4 @@
-const { Residence, Property } = require('../models');
+const { Residence, Property, Owner } = require('../models');
 const fs = require('fs');
 const path = require('path');
 
@@ -28,6 +28,11 @@ exports.getResidences = async (req, res) => {
     
     // Role-based filtering
     if (req.user) {
+        if (req.user.role === 'RESIDENT') {
+            const owner = await Owner.findOne({ where: { email: req.user.email } });
+            if (!owner || !owner.residenceId) return res.json([]);
+            where.id = owner.residenceId;
+        }
         if (req.user.role === 'RESPONSABLE_ZONE') {
             const zone = String(req.user.zone || '').trim();
             if (!zone) {
@@ -44,7 +49,7 @@ exports.getResidences = async (req, res) => {
 
     const residences = await Residence.findAll({
       where,
-      include: req.user ? [{ model: Property }] : [] // Only include properties for authenticated staff
+      include: req.user && req.user.role !== 'RESIDENT' ? [{ model: Property }] : [] // Only include properties for authenticated staff
     });
     res.json(residences);
   } catch (err) {
@@ -56,6 +61,13 @@ exports.getResidences = async (req, res) => {
 // @route   GET /api/residences/:id
 exports.getResidence = async (req, res) => {
   try {
+    if (req.user?.role === 'RESIDENT') {
+      const owner = await Owner.findOne({ where: { email: req.user.email } });
+      if (!owner || !owner.residenceId || String(owner.residenceId) !== String(req.params.id)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+
     const residence = await Residence.findByPk(req.params.id, {
       include: [{ model: Property }]
     });

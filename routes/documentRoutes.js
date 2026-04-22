@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, admin } = require('../middleware/authMiddleware');
+const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 const { documentUpload } = require('../middleware/uploadMiddleware');
 const {
   getDocuments,
@@ -10,13 +10,13 @@ const {
 } = require('../controllers/documentController');
 
 router.route('/')
-  .get(protect, admin, getDocuments)
-  .post(protect, admin, documentUpload.single('file'), createDocument);
+  .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'HSE', 'RECOUVREMENT'), getDocuments)
+  .post(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'HSE', 'RECOUVREMENT'), documentUpload.single('file'), createDocument);
 
 router.route('/:id/download')
-  .get(protect, admin, downloadDocument);
+  .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'HSE', 'RECOUVREMENT'), downloadDocument);
 
 router.route('/:id')
-  .delete(protect, admin, deleteDocument);
+  .delete(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'HSE', 'RECOUVREMENT'), deleteDocument);
 
 module.exports = router;

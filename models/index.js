@@ -10,6 +10,7 @@ const Notification = require('./Notification');
 const Subcontractor = require('./Subcontractor');
 const RegistrationRequest = require('./RegistrationRequest');
 const UserDevice = require('./UserDevice');
+const AuditLog = require('./AuditLog');
 
 // Define Associations
 
@@ -81,4 +82,5 @@ module.exports = {
   Subcontractor,
   RegistrationRequest,
   UserDevice,
+  AuditLog,
 };

@@ -86,6 +86,22 @@ const MaintenanceTicket = sequelize.define('MaintenanceTicket', {
     type: DataTypes.STRING, // Payé, En attente, Non facturé
     defaultValue: 'Non facturé',
   },
+  attachmentUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  attachmentName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  attachmentType: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  attachmentSize: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 }, {
   timestamps: true,
   tableName: 'MaintenanceTicket',

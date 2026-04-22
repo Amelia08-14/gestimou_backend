@@ -13,6 +13,7 @@ const {
   UserDevice,
   Reserve
 } = require('../models');
+const { writeAuditLog } = require('../utils/auditLog');
 
 const parseDataUrl = (dataUrl) => {
   if (typeof dataUrl !== 'string') return null;
@@ -63,6 +64,14 @@ exports.downloadBackup = async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(JSON.stringify(payload));
+
+    await writeAuditLog({
+      req,
+      action: 'Sauvegarde',
+      details: `Sauvegarde exportée: ${filename}`,
+      user: req.user,
+      meta: { filename }
+    });
   } catch (err) {
     res.status(500).json({ error: 'Server Error' });
   }
@@ -101,6 +110,13 @@ exports.restoreBackup = async (req, res) => {
           transaction
         });
       }
+    });
+
+    await writeAuditLog({
+      req,
+      action: 'Restauration',
+      details: 'Sauvegarde restaurée',
+      user: req.user
     });
 
     res.json({ message: 'Backup restored' });

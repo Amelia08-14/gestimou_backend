@@ -17,11 +17,20 @@ exports.getOwners = async (req, res) => {
       where.email = { [Op.in]: emails };
     }
 
+    const residenceInclude = { model: Residence, as: 'residence', attributes: ['id', 'name', 'zone'], required: false };
+    if (req.user?.role === 'RESPONSABLE_ZONE') {
+      const zone = String(req.user.zone || '').trim();
+      if (zone && zone.toUpperCase() !== 'ALL') {
+        residenceInclude.where = { zone };
+        residenceInclude.required = true;
+      }
+    }
+
     const owners = await Owner.findAll({
       where,
       include: [
         { model: Property },
-        { model: Residence, as: 'residence', attributes: ['id', 'name', 'zone'] }
+        residenceInclude
       ],
       order: [['lastName', 'ASC']]
     });
@@ -52,6 +61,14 @@ exports.getOwner = async (req, res) => {
     });
     
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
+
+    if (req.user?.role === 'RESPONSABLE_ZONE') {
+      const zone = String(req.user.zone || '').trim();
+      if (zone && zone.toUpperCase() !== 'ALL') {
+        const ownerZone = String(owner.residence?.zone || '').trim();
+        if (!ownerZone || ownerZone !== zone) return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
     
     const ownerJson = owner.toJSON();
     ownerJson.propertiesCount = owner.Properties ? owner.Properties.length : 0;

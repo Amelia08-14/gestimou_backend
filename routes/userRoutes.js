@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 const {
   getUsers,
   getUser,
@@ -9,12 +10,12 @@ const {
 } = require('../controllers/userController');
 
 router.route('/')
-  .get(getUsers)
-  .post(createUser);
+  .get(protect, authorizeRoles('ADMIN', 'MANAGER'), getUsers)
+  .post(protect, authorizeRoles('ADMIN'), createUser);
 
 router.route('/:id')
-  .get(getUser)
-  .put(updateUser)
-  .delete(deleteUser);
+  .get(protect, authorizeRoles('ADMIN'), getUser)
+  .put(protect, authorizeRoles('ADMIN'), updateUser)
+  .delete(protect, authorizeRoles('ADMIN'), deleteUser);
 
 module.exports = router;

@@ -73,6 +73,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const registrationRoutes = require('./routes/registrationRoutes');
 const documentRoutes = require('./routes/documentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const auditLogRoutes = require('./routes/auditLogRoutes');
 const { startAnnualChargesScheduler } = require('./jobs/annualChargesScheduler');
 
 // Mount routers
@@ -88,6 +89,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 
 const PORT = process.env.PORT || 5000;
 

@@ -1,6 +1,7 @@
 const { User, UserDevice } = require('../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { writeAuditLog } = require('../utils/auditLog');
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
@@ -64,6 +65,14 @@ exports.login = async (req, res) => {
       process.env.JWT_SECRET || 'secret',
       { expiresIn: '30d' }
     );
+
+    await writeAuditLog({
+      req,
+      action: 'Connexion',
+      details: `Connexion de ${user.email}`,
+      user,
+      meta: { role: user.role }
+    });
     
     res.json({
       id: user.id,

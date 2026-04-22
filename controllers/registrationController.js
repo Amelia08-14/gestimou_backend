@@ -2,6 +2,7 @@ const { RegistrationRequest, User, Owner, Property, Residence } = require('../mo
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const nodemailer = require('nodemailer');
+const { writeAuditLog } = require('../utils/auditLog');
 
 let cachedTransporter = null;
 let cachedTransporterKey = null;
@@ -271,6 +272,14 @@ exports.approveRequest = async (req, res) => {
     // 4. Update Request Status
     await request.update({ status: 'APPROVED' });
 
+    await writeAuditLog({
+      req,
+      action: 'Validation inscription',
+      details: `Inscription validée: ${request.email}`,
+      user: req.user,
+      meta: { requestId: request.id }
+    });
+
     // 5. Send Email
     const emailSubject = 'Bienvenue sur Gestimou - Vos accès';
     const emailBody = `
@@ -310,6 +319,14 @@ exports.rejectRequest = async (req, res) => {
     }
 
     await request.update({ status: 'REJECTED' });
+
+    await writeAuditLog({
+      req,
+      action: 'Rejet inscription',
+      details: `Inscription rejetée: ${request.email}`,
+      user: req.user,
+      meta: { requestId: request.id }
+    });
 
     res.json({ message: 'Demande rejetée.' });
 

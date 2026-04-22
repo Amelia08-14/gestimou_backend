@@ -1,12 +1,29 @@
-const { Property, Owner } = require('../models');
+const { Property, Owner, Residence } = require('../models');
 
 // @desc    Get all properties
 // @route   GET /api/properties
 // @access  Public
 exports.getProperties = async (req, res) => {
   try {
+    const include = [
+      { model: Owner, as: 'owner', required: false },
+      { model: Residence, required: false, attributes: ['id', 'name', 'zone'] }
+    ];
+
+    if (req.user?.role === 'RESIDENT') {
+      include[0] = { model: Owner, as: 'owner', required: true, where: { email: req.user.email } };
+    }
+
+    if (req.user?.role === 'RESPONSABLE_ZONE') {
+      const zone = String(req.user.zone || '').trim();
+      if (zone && zone.toUpperCase() !== 'ALL') {
+        include[1].where = { zone };
+        include[1].required = true;
+      }
+    }
+
     const properties = await Property.findAll({
-      include: [{ model: Owner, as: 'owner' }]
+      include
     });
     res.json({ success: true, data: properties });
   } catch (err) {
@@ -21,11 +38,27 @@ exports.getProperties = async (req, res) => {
 exports.getProperty = async (req, res) => {
   try {
     const property = await Property.findByPk(req.params.id, {
-      include: [{ model: Owner, as: 'owner' }]
+      include: [
+        { model: Owner, as: 'owner', required: false },
+        { model: Residence, required: false, attributes: ['id', 'name', 'zone'] }
+      ]
     });
 
     if (!property) {
       return res.status(404).json({ success: false, error: 'Property not found' });
+    }
+
+    if (req.user?.role === 'RESIDENT') {
+      const email = property.owner?.email;
+      if (!email || email !== req.user.email) return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
+    if (req.user?.role === 'RESPONSABLE_ZONE') {
+      const zone = String(req.user.zone || '').trim();
+      if (zone && zone.toUpperCase() !== 'ALL') {
+        const propertyZone = String(property.Residence?.zone || '').trim();
+        if (!propertyZone || propertyZone !== zone) return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
     }
 
     res.json({ success: true, data: property });

@@ -43,6 +43,28 @@ const documentUpload = multer({
   }
 });
 
+const ticketsStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'uploads', 'tickets');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${makeSafeFilename(file.originalname)}`)
+});
+
+const ticketUpload = multer({
+  storage: ticketsStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!documentAllowedMimeTypes.has(file.mimetype)) {
+      cb(new Error('Unsupported file type'));
+      return;
+    }
+    cb(null, true);
+  }
+});
+
 module.exports = {
-  documentUpload
+  documentUpload,
+  ticketUpload
 };

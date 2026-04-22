@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, admin } = require('../middleware/authMiddleware');
+const { protect, optionalProtect, admin, authorizeRoles } = require('../middleware/authMiddleware');
 const {
   getResidences,
   getResidence,
@@ -11,11 +11,11 @@ const {
 } = require('../controllers/residenceController');
 
 router.route('/')
-  .get(getResidences) // Allow public access for registration dropdown
+  .get(optionalProtect, getResidences) // Public (dropdown) + filtered if authenticated
   .post(protect, admin, createResidence);
 
 router.route('/:id')
-  .get(protect, getResidence)
+  .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'HSE', 'INTERVENANT', 'RECOUVREMENT', 'RESIDENT'), getResidence)
   .put(protect, admin, updateResidence)
   .delete(protect, admin, deleteResidence);
 

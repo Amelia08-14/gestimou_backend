@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 const {
   getTransactions,
   getTransaction,
@@ -9,20 +10,15 @@ const {
   generateAnnualCharges
 } = require('../controllers/financialController');
 
-console.log('Loading financial routes...');
-
-router.post('/generate-charges', (req, res, next) => {
-    console.log('Hit /generate-charges');
-    next();
-}, generateAnnualCharges);
+router.post('/generate-charges', protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), generateAnnualCharges);
 
 router.route('/')
-  .get(getTransactions)
-  .post(createTransaction);
+  .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), getTransactions)
+  .post(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), createTransaction);
 
 router.route('/:id')
-  .get(getTransaction)
-  .put(updateTransaction)
-  .delete(deleteTransaction);
+  .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), getTransaction)
+  .put(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), updateTransaction)
+  .delete(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'RECOUVREMENT'), deleteTransaction);
 
 module.exports = router;
