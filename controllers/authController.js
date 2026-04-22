@@ -79,6 +79,8 @@ exports.login = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      profession: user.profession,
+      zone: user.zone,
       mustChangePassword: !!user.mustChangePassword,
       token
     });
@@ -87,6 +89,21 @@ exports.login = async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Server Error' });
   }
+};
+
+// @desc    Get current user (me)
+// @route   GET /api/auth/me
+exports.me = async (req, res) => {
+  const user = req.user;
+  res.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    profession: user.profession,
+    zone: user.zone,
+    mustChangePassword: !!user.mustChangePassword,
+  });
 };
 
 exports.changePassword = async (req, res) => {
