@@ -220,6 +220,7 @@ exports.approveRequest = async (req, res) => {
         password: hashedPassword,
         role: 'RESIDENT', // Mobile App User
         profession: 'Propriétaire',
+        mustChangePassword: true,
         // Link to Owner? User model doesn't strictly link to Owner, but Owner links to Property.
         // Ideally we should link User to Owner, but for now email match is enough or we add ownerId to User.
     });

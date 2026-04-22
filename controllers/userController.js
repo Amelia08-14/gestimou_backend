@@ -49,7 +49,8 @@ exports.createUser = async (req, res) => {
       password: hashedPassword,
       role,
       profession,
-      zone
+      zone,
+      mustChangePassword: true
     });
     
     // Don't return password
@@ -82,6 +83,7 @@ exports.updateUser = async (req, res) => {
     
     if (password) {
       rest.password = await bcrypt.hash(password, 10);
+      rest.mustChangePassword = true;
     }
     
     await user.update(rest);

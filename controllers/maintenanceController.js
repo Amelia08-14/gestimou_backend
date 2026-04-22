@@ -235,6 +235,14 @@ exports.uploadTicketAttachment = async (req, res) => {
       attachmentSize: req.file.size,
     });
 
+    await writeAuditLog({
+      req,
+      action: 'Pièce jointe ticket',
+      details: `Pièce jointe uploadée: ${ticket.title}`,
+      user: req.user,
+      meta: { ticketId: ticket.id, attachmentName: req.file.originalname, size: req.file.size }
+    });
+
     res.json(ticket);
   } catch (err) {
     res.status(400).json({ error: err.message });

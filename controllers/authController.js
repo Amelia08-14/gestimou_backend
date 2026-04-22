@@ -79,6 +79,7 @@ exports.login = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      mustChangePassword: !!user.mustChangePassword,
       token
     });
     
@@ -107,7 +108,15 @@ exports.changePassword = async (req, res) => {
     // Hash new password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
+    user.mustChangePassword = false;
     await user.save();
+
+    await writeAuditLog({
+      req,
+      action: 'Changement mot de passe',
+      details: `Mot de passe modifié: ${user.email}`,
+      user
+    });
 
     res.json({ message: 'Mot de passe mis à jour avec succès' });
   } catch (err) {
