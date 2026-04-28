@@ -11,6 +11,9 @@
     "seed:residences-demo": "node scripts/seed_residence_demo_data.js",
     "seed:properties-demo": "node scripts/seed_properties_demo_data.js",
     "seed:prestataires-expenses": "node scripts/seed_subcontractors_and_expenses.js",
+    "seed:staff-demo": "node scripts/seed_staff_demo_data.js",
+    "seed:staff-aymen": "node scripts/seed_staff_aymenpromotion.js",
+    "reset:clean": "node scripts/reset_clean_base.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

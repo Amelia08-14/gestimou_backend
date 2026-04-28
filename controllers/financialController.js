@@ -33,23 +33,19 @@ const generateAnnualChargesInternal = async ({ year, amount, force = false, now 
   let notified = 0;
 
   for (const property of properties) {
-    const startWindowEnd = new Date(periodStart);
-    startWindowEnd.setDate(startWindowEnd.getDate() + 1);
-    const endWindowStart = new Date(periodEnd);
-    endWindowStart.setDate(endWindowStart.getDate() - 1);
-
     const existing = await FinancialTransaction.findOne({
       where: {
         propertyId: property.id,
         type: 'Charge',
-        periodStart: { [Op.between]: [periodStart, startWindowEnd] },
-        periodEnd: { [Op.between]: [endWindowStart, periodEnd] }
+        periodStart: { [Op.lte]: periodStart },
+        periodEnd: { [Op.gte]: periodEnd }
       }
     });
 
     if (existing) continue;
 
-    const chargeAmount = Number(amount || property.price || 15000);
+    const monthlyAmount = Number(amount || property.price || 15000);
+    const chargeAmount = monthlyAmount;
     const residence = residenceById.get(property.residenceId);
     const residenceName = residence?.name || property.residenceId || '';
     const description = `Charge gestion - Année ${safeYear}`;
@@ -75,7 +71,7 @@ const generateAnnualChargesInternal = async ({ year, amount, force = false, now 
         await Notification.create({
           userId: user.id,
           title: 'Charge annuelle',
-          message: `Votre charge annuelle ${safeYear} a été générée pour ${residenceName} (${property.title}). Montant: ${chargeAmount} DA. Échéance: ${periodEnd.toLocaleDateString('fr-FR')}.`,
+          message: `Votre charge annuelle ${safeYear} a été générée pour ${residenceName} (${property.title}). Montant: ${monthlyAmount} DA/mois. Échéance: ${periodEnd.toLocaleDateString('fr-FR')}.`,
           type: 'WARNING'
         });
         notified += 1;
@@ -88,6 +84,87 @@ const generateAnnualChargesInternal = async ({ year, amount, force = false, now 
   }
 
   return { skipped: false, created, notified, year: safeYear };
+};
+
+// @desc    Get resident charges summary (due date + notifications)
+// @route   GET /api/financial/my-charges-summary
+exports.getMyChargesSummary = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Not authorized' });
+    if (user.role !== 'RESIDENT') return res.status(403).json({ error: 'Forbidden' });
+
+    const props = await Property.findAll({
+      attributes: ['id', 'price'],
+      include: [{ model: Owner, as: 'owner', required: true, where: { email: String(user.email).toLowerCase() }, attributes: ['id', 'email'] }]
+    });
+    const propertyIds = props.map((p) => p.id);
+    if (propertyIds.length === 0) {
+      return res.json({ status: 'Actif', nextPaymentDate: null, annualAmount: 15000 * 12, daysRemaining: null });
+    }
+
+    const charges = await FinancialTransaction.findAll({
+      where: { type: 'Charge', propertyId: { [Op.in]: propertyIds } },
+      order: [['periodEnd', 'ASC']]
+    });
+
+    const now = new Date();
+    let nextUnpaid = null;
+    let latestPaidEnd = null;
+
+    for (const c of charges) {
+      const end = c.periodEnd ? new Date(c.periodEnd) : null;
+      if (!end || Number.isNaN(end.getTime())) continue;
+      if (String(c.status || '') === 'Payé') {
+        if (!latestPaidEnd || end > latestPaidEnd) latestPaidEnd = end;
+        continue;
+      }
+      if (!nextUnpaid || end < nextUnpaid) nextUnpaid = end;
+    }
+
+    const due = nextUnpaid || latestPaidEnd;
+    if (!due) {
+      return res.json({ status: 'Actif', nextPaymentDate: null, annualAmount: 15000 * 12, daysRemaining: null });
+    }
+
+    const msLeft = due.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+
+    const shouldWarn = daysRemaining <= 90 && daysRemaining > 10;
+    const shouldUrgent = daysRemaining <= 10 && daysRemaining >= 0;
+
+    if (shouldWarn || shouldUrgent) {
+      const title = shouldUrgent ? 'Paiement urgent' : 'Paiement à venir';
+      const type = shouldUrgent ? 'ERROR' : 'WARNING';
+      const dateLabel = due.toLocaleDateString('fr-FR');
+      const message = shouldUrgent
+        ? `Important et urgent ; votre paiement doit se faire avant le : ${dateLabel}`
+        : `Votre paiement approche. Date prévue : ${dateLabel}`;
+
+      const recent = await Notification.findOne({
+        where: {
+          userId: user.id,
+          title,
+          createdAt: { [Op.gte]: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) }
+        },
+        order: [['createdAt', 'DESC']]
+      });
+
+      if (!recent) {
+        await Notification.create({ userId: user.id, title, message, type });
+      }
+    }
+
+    res.json({
+      status: 'Actif',
+      nextPaymentDate: due.toISOString(),
+      annualAmount: 15000 * 12,
+      daysRemaining
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server Error' });
+  }
 };
 
 // @desc    Get all transactions

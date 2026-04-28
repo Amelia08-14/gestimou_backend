@@ -7,7 +7,7 @@ exports.getProperties = async (req, res) => {
   try {
     const include = [
       { model: Owner, as: 'owner', required: false },
-      { model: Residence, required: false, attributes: ['id', 'name', 'zone'] }
+      { model: Residence, required: false, attributes: ['id', 'name', 'zone', 'managerName'] }
     ];
 
     if (req.user?.role === 'RESIDENT') {
@@ -40,7 +40,7 @@ exports.getProperty = async (req, res) => {
     const property = await Property.findByPk(req.params.id, {
       include: [
         { model: Owner, as: 'owner', required: false },
-        { model: Residence, required: false, attributes: ['id', 'name', 'zone'] }
+        { model: Residence, required: false, attributes: ['id', 'name', 'zone', 'managerName'] }
       ]
     });
 
