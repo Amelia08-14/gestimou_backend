@@ -227,7 +227,8 @@ exports.createTicket = async (req, res) => {
 
     // Notification for requester confirmation
     if (ticket.email) {
-      const requesterUser = await User.findOne({ where: { email: ticket.email } });
+      const normalizedEmail = String(ticket.email || '').trim().toLowerCase();
+      const requesterUser = normalizedEmail ? await User.findOne({ where: { email: normalizedEmail } }) : null;
       if (requesterUser) {
         await Notification.create({
           userId: requesterUser.id,
@@ -308,11 +309,37 @@ exports.updateTicket = async (req, res) => {
 
     // Notify requester when status changes
     if (before.status !== after.status && ticket.email) {
-      const requesterUser = await User.findOne({ where: { email: ticket.email } });
+      const normalizedEmail = String(ticket.email || '').trim().toLowerCase();
+      const requesterUser = normalizedEmail ? await User.findOne({ where: { email: normalizedEmail } }) : null;
       if (requesterUser) {
         await Notification.create({
           userId: requesterUser.id,
           title: 'Statut ticket mis à jour',
+          message: `Le ticket "${ticket.title}" est passé à "${ticket.status}".`,
+          type: ticket.status === 'Terminé' ? 'SUCCESS' : 'INFO'
+        });
+      }
+    }
+
+    // Notify admins/managers/zone managers when status changes
+    if (before.status !== after.status) {
+      const residence = ticket.residenceId ? await Residence.findByPk(ticket.residenceId) : null;
+      const admins = await User.findAll({
+        where: {
+          role: { [Op.in]: ['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE'] }
+        }
+      });
+
+      for (const adminUser of admins) {
+        if (adminUser.role === 'RESPONSABLE_ZONE') {
+          if (!adminUser.zone) continue;
+          if (!residence?.zone) continue;
+          if (adminUser.zone !== residence.zone) continue;
+        }
+
+        await Notification.create({
+          userId: adminUser.id,
+          title: 'Ticket: statut mis à jour',
           message: `Le ticket "${ticket.title}" est passé à "${ticket.status}".`,
           type: ticket.status === 'Terminé' ? 'SUCCESS' : 'INFO'
         });
