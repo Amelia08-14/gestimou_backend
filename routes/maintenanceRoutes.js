@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { protect, authorizeRoles } = require('../middleware/authMiddleware');
+const { protect, optionalProtect, authorizeRoles } = require('../middleware/authMiddleware');
 const { ticketUpload } = require('../middleware/uploadMiddleware');
 const {
+  getMaintenanceCategories,
   getTickets,
   getTicket,
   createTicket,
@@ -10,6 +11,8 @@ const {
   deleteTicket,
   uploadTicketAttachment
 } = require('../controllers/maintenanceController');
+
+router.get('/categories', optionalProtect, getMaintenanceCategories);
 
 router.route('/')
   .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'HSE', 'INTERVENANT', 'RESIDENT'), getTickets)

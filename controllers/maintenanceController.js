@@ -1,8 +1,100 @@
 const { Op } = require('sequelize');
-const { MaintenanceTicket, Subcontractor, User, Notification, Residence } = require('../models');
+const { MaintenanceTicket, Subcontractor, User, Notification, Residence, Property, Owner } = require('../models');
 const { writeAuditLog } = require('../utils/auditLog');
 
 const isAllZones = (zone) => String(zone || '').trim().toUpperCase() === 'ALL';
+
+const PROBLEM_TYPES = [
+  {
+    category: 'Peinture (Partie Commune)',
+    items: [
+      'Retouches peinture couloir',
+      'Peinture écaillée',
+      "Traces d'humidité",
+      'Autre problème de peinture'
+    ]
+  },
+  {
+    category: 'Plomberie (Partie Commune)',
+    items: [
+      "Fuite d'eau",
+      'Canalisation bouchée',
+      'Mauvaise odeur',
+      'Autre problème plomberie'
+    ]
+  },
+  {
+    category: 'Problème Bâche à eau',
+    items: [
+      "Niveau d'eau bas",
+      'Fuite bâche',
+      'Pompe défectueuse',
+      'Autre problème bâche'
+    ]
+  },
+  {
+    category: 'Problème Groupe électrogène',
+    items: [
+      'Panne au démarrage',
+      'Niveau carburant bas',
+      'Bruit anormal',
+      'Eclairage défectueux'
+    ]
+  },
+  {
+    category: 'Ascenseurs & Accès',
+    items: [
+      'Ascenseur en panne',
+      "Problème TAG d'accès",
+      'Rideau parking défaillant',
+      'Porte hall bloquée'
+    ]
+  },
+  {
+    category: 'Hygiène & Sécurité',
+    items: [
+      'Déchets accumulés',
+      'Nettoyage partie communes',
+      'Problème de sécurité',
+      'Nuisances sonores'
+    ]
+  },
+  {
+    category: 'Espaces Extérieurs',
+    items: [
+      'Espace vert',
+      'Place de parking occupée',
+      'Eclairage extérieur'
+    ]
+  },
+  {
+    category: 'Autres',
+    items: ['Autres']
+  }
+];
+
+const isCoproTicketCategory = (category) => {
+  const value = String(category || '');
+  return value.includes('Partie Commune') || value.startsWith('Copropriété');
+};
+
+const getResidentResidenceIds = async (email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return [];
+
+  const properties = await Property.findAll({
+    attributes: ['residenceId'],
+    include: [
+      { model: Owner, as: 'owner', required: true, where: { email: normalizedEmail }, attributes: [] }
+    ]
+  });
+
+  return Array.from(new Set(properties.map((p) => p.residenceId).filter(Boolean)));
+};
+
+exports.getMaintenanceCategories = async (req, res) => {
+  res.json({ success: true, data: PROBLEM_TYPES });
+};
 
 const canAccessTicket = async (user, ticketId) => {
   const ticket = await MaintenanceTicket.findByPk(ticketId, {
@@ -12,7 +104,12 @@ const canAccessTicket = async (user, ticketId) => {
   if (!user) return { ok: false, status: 401, error: 'Not authorized' };
 
   if (user.role === 'RESIDENT') {
-    if (!ticket.email || ticket.email !== user.email) return { ok: false, status: 403, error: 'Forbidden' };
+    const ownTicket = ticket.email && user.email && ticket.email === user.email;
+    if (!ownTicket) {
+      const residenceIds = await getResidentResidenceIds(user.email);
+      const allowedCopro = residenceIds.includes(ticket.residenceId) && isCoproTicketCategory(ticket.category);
+      if (!allowedCopro) return { ok: false, status: 403, error: 'Forbidden' };
+    }
   }
 
   if (user.role === 'INTERVENANT') {
@@ -44,7 +141,18 @@ exports.getTickets = async (req, res) => {
     
     // Filtering for Residents: Only show their own tickets
     if (req.user && req.user.role === 'RESIDENT') {
-        where.email = req.user.email; 
+        const scope = String(req.query.scope || '').trim().toLowerCase();
+        if (scope === 'residence') {
+          const residenceId = String(req.query.residenceId || '').trim();
+          const residenceIds = await getResidentResidenceIds(req.user.email);
+          if (!residenceId || !residenceIds.includes(residenceId)) {
+            return res.status(403).json({ error: 'Forbidden' });
+          }
+          where.residenceId = residenceId;
+          where.category = { [Op.or]: [{ [Op.like]: '%Partie Commune%' }, { [Op.like]: 'Copropriété%' }] };
+        } else {
+          where.email = req.user.email;
+        }
     }
 
     // Filtering for Intervenants: Only show tickets assigned to them
