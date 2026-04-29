@@ -225,6 +225,19 @@ exports.createTicket = async (req, res) => {
     
     const residence = ticket.residenceId ? await Residence.findByPk(ticket.residenceId) : null;
 
+    // Notification for requester confirmation
+    if (ticket.email) {
+      const requesterUser = await User.findOne({ where: { email: ticket.email } });
+      if (requesterUser) {
+        await Notification.create({
+          userId: requesterUser.id,
+          title: 'Ticket enregistré',
+          message: `Votre ticket "${ticket.title}" a bien été enregistré.`,
+          type: 'INFO'
+        });
+      }
+    }
+
     // Notification for Managers/Admins when a ticket is created
     const admins = await User.findAll({ 
         where: { 
@@ -292,6 +305,20 @@ exports.updateTicket = async (req, res) => {
     }
 
     const after = { status: ticket.status, assignee: ticket.assignee, subcontractorId: ticket.subcontractorId };
+
+    // Notify requester when status changes
+    if (before.status !== after.status && ticket.email) {
+      const requesterUser = await User.findOne({ where: { email: ticket.email } });
+      if (requesterUser) {
+        await Notification.create({
+          userId: requesterUser.id,
+          title: 'Statut ticket mis à jour',
+          message: `Le ticket "${ticket.title}" est passé à "${ticket.status}".`,
+          type: ticket.status === 'Terminé' ? 'SUCCESS' : 'INFO'
+        });
+      }
+    }
+
     const changed = JSON.stringify(before) !== JSON.stringify(after);
     if (changed) {
       await writeAuditLog({
