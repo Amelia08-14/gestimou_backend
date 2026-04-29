@@ -8,9 +8,10 @@ const { writeAuditLog } = require('../utils/auditLog');
 exports.login = async (req, res) => {
   try {
     const { email, password, deviceId, deviceName } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     
     // Check if user exists
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ where: { email: normalizedEmail } });
     if (!user) {
       return res.status(401).json({ error: 'Identifiants invalides' });
     }
@@ -69,7 +70,7 @@ exports.login = async (req, res) => {
     await writeAuditLog({
       req,
       action: 'Connexion',
-      details: `Connexion de ${user.email}`,
+      details: `Connexion de ${normalizedEmail}`,
       user,
       meta: { role: user.role }
     });
