@@ -62,6 +62,10 @@ app.get('/', (req, res) => {
   res.send('API is running...');
 });
 
+app.get('/api/_health', (req, res) => {
+  res.json({ ok: true, ts: new Date().toISOString() });
+});
+
 const financialRoutes = require('./routes/financialRoutes');
 const maintenanceRoutes = require('./routes/maintenanceRoutes');
 const ownerRoutes = require('./routes/ownerRoutes');
