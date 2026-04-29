@@ -348,10 +348,15 @@ exports.updateTicket = async (req, res) => {
 
     const changed = JSON.stringify(before) !== JSON.stringify(after);
     if (changed) {
+      const statusChanged = before.status !== after.status;
+      const details = statusChanged
+        ? `Statut ticket "${ticket.title}": ${before.status} → ${after.status}`
+        : `Ticket mis à jour: ${ticket.title}`;
+
       await writeAuditLog({
         req,
-        action: 'Mise à jour ticket',
-        details: `Ticket mis à jour: ${ticket.title}`,
+        action: statusChanged ? 'Changement statut ticket' : 'Mise à jour ticket',
+        details,
         user: req.user,
         meta: { ticketId: ticket.id, before, after }
       });

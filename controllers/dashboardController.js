@@ -1,4 +1,4 @@
-const { Residence, MaintenanceTicket, FinancialTransaction, Owner } = require('../models');
+const { Residence, MaintenanceTicket, FinancialTransaction, Owner, Property, AuditLog } = require('../models');
 const { Op } = require('sequelize');
 
 // @desc    Get dashboard stats
@@ -13,20 +13,13 @@ exports.getDashboardStats = async (req, res) => {
       where: { status: { [Op.not]: 'Terminé' } }
     });
 
-    // Occupancy Rate
-    const residences = await Residence.findAll({
-      attributes: ['totalUnits', 'deliveredUnits']
-    });
-    
-    let totalDelivered = 0;
-    let totalUnits = 0;
-    residences.forEach(r => {
-      totalDelivered += r.deliveredUnits || 0;
-      totalUnits += r.totalUnits || 0;
-    });
-    
-    const occupancyRate = totalUnits > 0 
-      ? Math.round((totalDelivered / totalUnits) * 100) + '%' 
+    // Occupancy Rate (based on sold units)
+    const residences = await Residence.findAll({ attributes: ['totalUnits'] });
+    const totalUnits = residences.reduce((acc, r) => acc + (r.totalUnits || 0), 0);
+    const soldUnits = await Property.count({ where: { status: 'Vendu' } });
+
+    const occupancyRate = totalUnits > 0
+      ? `${Math.round((soldUnits / totalUnits) * 100)}%`
       : '0%';
 
     // Monthly Revenue (Current Month)
@@ -118,11 +111,10 @@ exports.getDashboardStats = async (req, res) => {
       });
     }
 
-    // 4. Recent Activities
-    const recentTickets = await MaintenanceTicket.findAll({
-      limit: 5,
-      order: [['createdAt', 'DESC']],
-      include: [{ model: Residence, as: 'residence', attributes: ['name'] }]
+    // 4. Recent Activities (audit logs + transactions + owners)
+    const recentLogs = await AuditLog.findAll({
+      limit: 20,
+      order: [['createdAt', 'DESC']]
     });
     
     const recentTransactions = await FinancialTransaction.findAll({
@@ -140,14 +132,27 @@ exports.getDashboardStats = async (req, res) => {
     });
 
     const activities = [
-      ...recentTickets.map(t => ({
-        type: 'warning',
-        user: t.requester,
-        action: `A signalé: ${t.title}`,
-        time: t.createdAt.toLocaleDateString('fr-FR'),
-        amount: t.status,
-        date: t.createdAt
-      })),
+      ...recentLogs.map((l) => {
+        const action = String(l.action || '');
+        const details = String(l.details || '').trim();
+        const type =
+          action.toLowerCase().includes('rejet') ? 'neutral' :
+          action.toLowerCase().includes('supp') ? 'neutral' :
+          action.toLowerCase().includes('erreur') ? 'warning' :
+          action.toLowerCase().includes('paiement') ? 'success' :
+          action.toLowerCase().includes('ticket') ? 'warning' :
+          action.toLowerCase().includes('connexion') ? 'info' :
+          'info';
+
+        return {
+          type,
+          user: l.userName || 'Système',
+          action: details || action,
+          time: l.createdAt.toLocaleDateString('fr-FR'),
+          amount: l.userRole || '',
+          date: l.createdAt
+        };
+      }),
       ...recentTransactions.map(t => ({
         type: t.type === 'Charge' ? 'success' : 'neutral',
         user: 'Système', // Simplify for now
