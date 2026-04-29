@@ -4,6 +4,55 @@ const { Op } = require('sequelize');
 const nodemailer = require('nodemailer');
 const { writeAuditLog } = require('../utils/auditLog');
 
+const apartmentNumberFromLotNumber = (lotNumber) => {
+  const raw = String(lotNumber || '').trim();
+  if (!raw) return '';
+  const parts = raw.split('-').filter(Boolean);
+  return String(parts[parts.length - 1] || raw).trim();
+};
+
+// @desc    Get registration options for a residence (floors + available apartments)
+// @route   GET /api/registrations/options?residenceId=...
+// @access  Public
+exports.getResidenceOptions = async (req, res) => {
+  try {
+    const residenceId = String(req.query.residenceId || '').trim();
+    if (!residenceId) {
+      return res.status(400).json({ success: false, error: 'residenceId requis.' });
+    }
+
+    const properties = await Property.findAll({
+      where: {
+        residenceId,
+        status: 'Libre'
+      },
+      attributes: ['id', 'floor', 'block', 'lotNumber', 'status', 'residenceId'],
+      order: [
+        ['floor', 'ASC'],
+        ['block', 'ASC'],
+        ['lotNumber', 'ASC']
+      ]
+    });
+
+    const units = properties
+      .map((p) => ({
+        id: p.id,
+        floor: p.floor || '',
+        block: p.block || '',
+        apartmentNumber: apartmentNumberFromLotNumber(p.lotNumber),
+        lotNumber: String(p.lotNumber || '')
+      }))
+      .filter((u) => Boolean(u.apartmentNumber));
+
+    const floors = Array.from(new Set(units.map((u) => String(u.floor || '').trim()).filter(Boolean)));
+
+    res.json({ success: true, data: { floors, units } });
+  } catch (err) {
+    console.error('Error fetching registration options:', err);
+    res.status(500).json({ success: false, error: 'Erreur serveur.' });
+  }
+};
+
 let cachedTransporter = null;
 let cachedTransporterKey = null;
 
@@ -104,6 +153,12 @@ exports.submitRequest = async (req, res) => {
     if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !normalizedPhone) {
         return res.status(400).json({ error: 'Veuillez remplir tous les champs obligatoires (Nom, Prénom, Email, Téléphone).' });
     }
+    if (!normalizedResidenceId) {
+        return res.status(400).json({ error: 'Veuillez sélectionner une résidence.' });
+    }
+    if (!String(floor || '').trim() || !String(door || '').trim()) {
+        return res.status(400).json({ error: 'Veuillez sélectionner l’étage et le numéro d’appartement.' });
+    }
 
     // Check if email already exists in User or Request
     const existingUser = await User.findOne({ where: { email: normalizedEmail } });
@@ -122,7 +177,7 @@ exports.submitRequest = async (req, res) => {
         lastName: normalizedLastName,
         email: normalizedEmail,
         phone: normalizedPhone,
-        residenceId: normalizedResidenceId || 'Non spécifié',
+        residenceId: normalizedResidenceId,
         block: String(block || '').trim(),
         floor: String(floor || '').trim(),
         door: String(door || '').trim()
@@ -205,7 +260,18 @@ exports.approveRequest = async (req, res) => {
             lastName: request.lastName,
             email: request.email,
             phone: request.phone,
+            residenceId: request.residenceId,
+            block: request.block || null,
+            floor: request.floor || null,
+            doorNumber: request.door || null,
             status: 'Actif'
+        });
+    } else {
+        await owner.update({
+            residenceId: request.residenceId || owner.residenceId,
+            block: (request.block && request.block.trim() !== '') ? request.block.trim() : owner.block,
+            floor: (request.floor && request.floor.trim() !== '') ? request.floor.trim() : owner.floor,
+            doorNumber: (request.door && request.door.trim() !== '') ? request.door.trim() : owner.doorNumber
         });
     }
 
@@ -229,19 +295,21 @@ exports.approveRequest = async (req, res) => {
     // We try to find property by details provided
     let linkedProperty = null;
     if (request.residenceId && request.door) { // Block might be empty
+        const doorNumber = request.door.trim();
         const whereClause = {
             residenceId: request.residenceId,
-            lotNumber: request.door.trim()
+            status: 'Libre',
+            [Op.or]: [
+                { lotNumber: doorNumber },
+                { lotNumber: { [Op.like]: `%-${doorNumber}` } }
+            ]
         };
 
-        // Handle block: if request.block is provided, match it. If not, match NULL or empty string.
         if (request.block && request.block.trim() !== '') {
             whereClause.block = request.block.trim();
-        } else {
-            // If block is not provided in request, we look for properties where block is NULL or empty
-            whereClause.block = {
-                [Op.or]: [null, '']
-            };
+        }
+        if (request.floor && request.floor.trim() !== '') {
+            whereClause.floor = request.floor.trim();
         }
 
         console.log('Searching for property with:', whereClause);
