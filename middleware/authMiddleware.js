@@ -1,43 +1,39 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 
+const extractBearerToken = (authorization) => {
+  const raw = String(authorization || '').trim();
+  if (!raw) return null;
+  const [scheme, ...rest] = raw.split(' ');
+  if (String(scheme || '').toLowerCase() !== 'bearer') return null;
+  const token = rest.join(' ').trim();
+  if (!token) return null;
+  if (token === 'null' || token === 'undefined') return null;
+  return token;
+};
+
 const protect = async (req, res, next) => {
-  let token;
+  const token = extractBearerToken(req.headers.authorization);
+  if (!token) return res.status(401).json({ error: 'Not authorized, no token' });
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    token = req.headers.authorization.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ error: 'Not authorized, no token' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+
+    req.user = await User.findByPk(decoded.id);
+
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authorized, user not found' });
     }
 
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-
-      req.user = await User.findByPk(decoded.id);
-
-      if (!req.user) {
-        return res.status(401).json({ error: 'Not authorized, user not found' });
-      }
-
-      return next();
-    } catch (error) {
-      console.error(error);
-      return res.status(401).json({ error: 'Not authorized, token failed' });
-    }
-  }
-
-  if (!token) {
-    return res.status(401).json({ error: 'Not authorized, no token' });
+    return next();
+  } catch (error) {
+    console.error(error);
+    return res.status(401).json({ error: 'Not authorized, token failed' });
   }
 };
 
 const optionalProtect = async (req, res, next) => {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer')) return next();
-  const token = auth.split(' ')[1];
+  const token = extractBearerToken(req.headers.authorization);
   if (!token) return next();
 
   try {

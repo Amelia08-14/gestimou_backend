@@ -10,7 +10,12 @@ const propertyRoutes = require('./routes/propertyRoutes');
 // Import Models and Associations
 require('./models/index');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error('Missing JWT_SECRET in production.');
+  process.exit(1);
+}
 
 const app = express();
 
