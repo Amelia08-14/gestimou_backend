@@ -109,21 +109,39 @@ exports.getAppelsDeFonds = async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
-    const withStats = await Promise.all(
-      appels.map(async (a) => {
-        const ownerCount = await getOwnerCount(a.residenceId);
-        const perOwner = toMoneyNumber(a.queteParProprietaire) ?? 0;
-        const expectedTotal = ownerCount * perOwner;
-        return {
-          ...a.toJSON(),
-          ownerCount,
-          expectedTotal,
-          dashboard: computeDashboard(a),
-        };
-      })
-    );
+    try {
+      const withStats = await Promise.all(
+        appels.map(async (a) => {
+          const ownerCount = await getOwnerCount(a.residenceId);
+          const perOwner = toMoneyNumber(a.queteParProprietaire) ?? 0;
+          const expectedTotal = ownerCount * perOwner;
+          return {
+            ...a.toJSON(),
+            ownerCount,
+            expectedTotal,
+            dashboard: computeDashboard(a),
+          };
+        })
+      );
 
-    res.json(withStats);
+      return res.json(withStats);
+    } catch (innerErr) {
+      console.error('getAppelsDeFonds stats error', {
+        name: innerErr?.name,
+        message: innerErr?.message,
+        code: innerErr?.original?.code,
+        sqlMessage: innerErr?.original?.sqlMessage,
+      });
+
+      return res.json(
+        appels.map((a) => ({
+          ...a.toJSON(),
+          ownerCount: 0,
+          expectedTotal: 0,
+          dashboard: computeDashboard(a),
+        }))
+      );
+    }
   } catch (err) {
     console.error('getAppelsDeFonds error', {
       name: err?.name,
