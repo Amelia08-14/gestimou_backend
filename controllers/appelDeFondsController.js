@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
-const { AppelDeFonds, AppelDeFondsDocument, Document, Residence, Owner, User, Notification } = require('../models');
+const { sequelize } = require('../config/db');
+const { AppelDeFonds, AppelDeFondsDocument, Document, Residence, Owner, Property, User, Notification } = require('../models');
 const { writeAuditLog } = require('../utils/auditLog');
 
 const toMoneyNumber = (value) => {
@@ -21,18 +22,53 @@ const computeDashboard = ({ queteRassemblee, coutReel }) => {
 
 const getOwnerCount = async (residenceId) => {
   if (!residenceId) return 0;
-  return Owner.count({ where: { residenceId: String(residenceId) } });
+  try {
+    return Property.count({
+      where: { residenceId: String(residenceId), ownerId: { [Op.ne]: null } },
+      distinct: true,
+      col: 'ownerId',
+    });
+  } catch (_) {
+    return 0;
+  }
+};
+
+const getOwnerEmailsForResidence = async (residenceId) => {
+  const rid = String(residenceId || '').trim();
+  if (!rid) return [];
+
+  try {
+    const owners = await Owner.findAll({
+      where: { residenceId: rid },
+      attributes: ['email'],
+    });
+    return owners
+      .map((o) => String(o.email || '').trim().toLowerCase())
+      .filter(Boolean);
+  } catch (_) {
+  }
+
+  const candidates = ['Owner', 'owner'];
+  for (const table of candidates) {
+    try {
+      const [rows] = await sequelize.query(
+        `SELECT email FROM \`${table}\` WHERE residenceId = :rid`,
+        { replacements: { rid } }
+      );
+      if (!Array.isArray(rows)) continue;
+      const emails = rows
+        .map((r) => String(r?.email || '').trim().toLowerCase())
+        .filter(Boolean);
+      if (emails.length) return emails;
+    } catch (_) {
+    }
+  }
+
+  return [];
 };
 
 const notifyResidentsForResidence = async ({ residenceId, title, message }) => {
-  const owners = await Owner.findAll({
-    where: { residenceId: String(residenceId) },
-    attributes: ['email'],
-  });
-
-  const emails = owners
-    .map((o) => String(o.email || '').trim().toLowerCase())
-    .filter(Boolean);
+  const emails = await getOwnerEmailsForResidence(residenceId);
 
   if (!emails.length) return 0;
 
@@ -89,6 +125,12 @@ exports.getAppelsDeFonds = async (req, res) => {
 
     res.json(withStats);
   } catch (err) {
+    console.error('getAppelsDeFonds error', {
+      name: err?.name,
+      message: err?.message,
+      code: err?.original?.code,
+      sqlMessage: err?.original?.sqlMessage,
+    });
     res.status(500).json({ error: 'Server Error' });
   }
 };
@@ -121,6 +163,12 @@ exports.getAppelDeFondsById = async (req, res) => {
       dashboard: computeDashboard(appel),
     });
   } catch (err) {
+    console.error('getAppelDeFondsById error', {
+      name: err?.name,
+      message: err?.message,
+      code: err?.original?.code,
+      sqlMessage: err?.original?.sqlMessage,
+    });
     res.status(500).json({ error: 'Server Error' });
   }
 };
@@ -161,6 +209,12 @@ exports.createAppelDeFonds = async (req, res) => {
 
     res.status(201).json(appel);
   } catch (err) {
+    console.error('createAppelDeFonds error', {
+      name: err?.name,
+      message: err?.message,
+      code: err?.original?.code,
+      sqlMessage: err?.original?.sqlMessage,
+    });
     res.status(500).json({ error: 'Server Error' });
   }
 };
@@ -235,6 +289,12 @@ exports.updateAppelDeFonds = async (req, res) => {
 
     res.json({ ...appel.toJSON(), notifiedResidents: notified, dashboard: computeDashboard(appel) });
   } catch (err) {
+    console.error('updateAppelDeFonds error', {
+      name: err?.name,
+      message: err?.message,
+      code: err?.original?.code,
+      sqlMessage: err?.original?.sqlMessage,
+    });
     res.status(500).json({ error: 'Server Error' });
   }
 };
@@ -282,6 +342,12 @@ exports.attachDocuments = async (req, res) => {
 
     res.json(updated);
   } catch (err) {
+    console.error('attachDocuments error', {
+      name: err?.name,
+      message: err?.message,
+      code: err?.original?.code,
+      sqlMessage: err?.original?.sqlMessage,
+    });
     res.status(500).json({ error: 'Server Error' });
   }
 };
@@ -306,7 +372,12 @@ exports.detachDocument = async (req, res) => {
 
     res.json({ message: 'Document détaché' });
   } catch (err) {
+    console.error('detachDocument error', {
+      name: err?.name,
+      message: err?.message,
+      code: err?.original?.code,
+      sqlMessage: err?.original?.sqlMessage,
+    });
     res.status(500).json({ error: 'Server Error' });
   }
 };
-
