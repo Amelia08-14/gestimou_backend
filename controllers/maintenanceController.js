@@ -215,15 +215,27 @@ exports.getTicket = async (req, res) => {
 // @route   POST /api/maintenance
 exports.createTicket = async (req, res) => {
   try {
+    const rawDescription = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
+    const safeDescription = rawDescription.slice(0, 100);
+
     const ticketData = {
         ...req.body,
+        description: safeDescription,
         email: req.user ? req.user.email : req.body.email,
         requester: req.user ? req.user.name : (req.body.requester || 'Anonyme')
     };
 
+    const residence = ticketData.residenceId ? await Residence.findByPk(ticketData.residenceId) : null;
+    if (!ticketData.responsible && residence?.zone) {
+      const zoneManager = await User.findOne({
+        where: { role: 'RESPONSABLE_ZONE', zone: residence.zone }
+      });
+      if (zoneManager?.name) ticketData.responsible = zoneManager.name;
+    }
+
     const ticket = await MaintenanceTicket.create(ticketData);
     
-    const residence = ticket.residenceId ? await Residence.findByPk(ticket.residenceId) : null;
+    const createdResidence = residence || (ticket.residenceId ? await Residence.findByPk(ticket.residenceId) : null);
 
     // Notification for requester confirmation
     if (ticket.email) {
@@ -250,8 +262,8 @@ exports.createTicket = async (req, res) => {
         // Skip if zone manager but different zone
         if (admin.role === 'RESPONSABLE_ZONE') {
           if (!admin.zone) continue;
-          if (!residence?.zone) continue;
-          if (admin.zone !== residence.zone) continue;
+          if (!createdResidence?.zone) continue;
+          if (admin.zone !== createdResidence.zone) continue;
         }
 
         await Notification.create({
@@ -284,14 +296,70 @@ exports.updateTicket = async (req, res) => {
     if (!access.ok) return res.status(access.status).json({ error: access.error });
     const ticket = access.ticket;
     
-    const before = { status: ticket.status, assignee: ticket.assignee, subcontractorId: ticket.subcontractorId };
+    const before = { status: ticket.status, assignee: ticket.assignee, subcontractorId: ticket.subcontractorId, responsible: ticket.responsible };
     const oldIntervenant = ticket.subcontractorId;
-    await ticket.update(req.body);
+    const user = req.user;
+    const isAdmin = user?.role === 'ADMIN';
+    const isZoneManager = user?.role === 'RESPONSABLE_ZONE';
+    const profession = String(user?.profession || '').toLowerCase();
+    const isSecurityManager = user?.role === 'MANAGER' && (profession.includes('sécur') || profession.includes('secur'));
+
+    const patch = {};
+
+    if (typeof req.body?.status === 'string') patch.status = req.body.status;
+    if (typeof req.body?.priority === 'string') patch.priority = req.body.priority;
+    if (typeof req.body?.title === 'string') patch.title = req.body.title;
+    if (typeof req.body?.category === 'string' || req.body?.category === null) patch.category = req.body.category;
+    if (typeof req.body?.location === 'string') patch.location = req.body.location;
+
+    if ('description' in (req.body || {})) {
+      const raw = typeof req.body.description === 'string' ? req.body.description.trim() : '';
+      patch.description = raw.slice(0, 100);
+    }
+
+    if (typeof req.body?.responsible === 'string' || req.body?.responsible === null) {
+      if (!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+      patch.responsible = req.body.responsible || null;
+    }
+
+    const wantsAssignIntervenant = 'subcontractorId' in (req.body || {}) || 'assignee' in (req.body || {});
+    if (wantsAssignIntervenant) {
+      const residence = ticket.residenceId ? await Residence.findByPk(ticket.residenceId) : null;
+      const isInZone = isZoneManager && user?.zone && residence?.zone && user.zone === residence.zone;
+
+      const canSelfTake = !ticket.responsible && (isInZone || isSecurityManager);
+      const canAssign =
+        isAdmin ||
+        (ticket.responsible && user?.name && ticket.responsible === user.name) ||
+        canSelfTake;
+
+      if (!canAssign) return res.status(403).json({ error: 'Forbidden' });
+
+      if (!ticket.responsible && canSelfTake && user?.name) {
+        patch.responsible = user.name;
+      }
+
+      if (req.body.subcontractorId) {
+        patch.subcontractorId = req.body.subcontractorId;
+        patch.assignee = null;
+      } else if ('subcontractorId' in (req.body || {}) && !req.body.subcontractorId) {
+        patch.subcontractorId = null;
+      }
+
+      if (typeof req.body.assignee === 'string' && req.body.assignee.trim()) {
+        patch.assignee = req.body.assignee.trim();
+        patch.subcontractorId = null;
+      } else if ('assignee' in (req.body || {}) && !req.body.assignee) {
+        patch.assignee = null;
+      }
+    }
+
+    await ticket.update(patch);
 
     // Notification if a subcontractor (Intervenant) is assigned
-    if (req.body.subcontractorId && req.body.subcontractorId !== oldIntervenant) {
+    if (ticket.subcontractorId && ticket.subcontractorId !== oldIntervenant) {
         // Find if this subcontractor has a User account
-        const subcontractor = await Subcontractor.findByPk(req.body.subcontractorId);
+        const subcontractor = await Subcontractor.findByPk(ticket.subcontractorId);
         if (subcontractor && subcontractor.email) {
             const user = await User.findOne({ where: { email: subcontractor.email } });
             if (user) {
@@ -305,7 +373,7 @@ exports.updateTicket = async (req, res) => {
         }
     }
 
-    const after = { status: ticket.status, assignee: ticket.assignee, subcontractorId: ticket.subcontractorId };
+    const after = { status: ticket.status, assignee: ticket.assignee, subcontractorId: ticket.subcontractorId, responsible: ticket.responsible };
 
     // Notify requester when status changes
     if (before.status !== after.status && ticket.email) {

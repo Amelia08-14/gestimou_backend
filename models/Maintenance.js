@@ -31,7 +31,10 @@ const MaintenanceTicket = sequelize.define('MaintenanceTicket', {
   },
   description: {
     type: DataTypes.TEXT,
-    allowNull: false,
+    allowNull: true,
+    validate: {
+      len: [0, 100],
+    },
   },
   priority: {
     type: DataTypes.STRING,
@@ -58,6 +61,10 @@ const MaintenanceTicket = sequelize.define('MaintenanceTicket', {
     allowNull: true,
   },
   assignee: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  responsible: {
     type: DataTypes.STRING,
     allowNull: true,
   },

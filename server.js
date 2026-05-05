@@ -12,8 +12,6 @@ require('./models/index');
 
 dotenv.config();
 
-connectDB();
-
 const app = express();
 
 const corsOptions = {
@@ -79,6 +77,8 @@ const { getResidenceOptions } = require('./controllers/registrationController');
 const documentRoutes = require('./routes/documentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const auditLogRoutes = require('./routes/auditLogRoutes');
+const subcontractorRoutes = require('./routes/subcontractorRoutes');
+const appelDeFondsRoutes = require('./routes/appelDeFondsRoutes');
 const { startAnnualChargesScheduler } = require('./jobs/annualChargesScheduler');
 
 // Mount routers
@@ -91,11 +91,13 @@ app.use('/api/residences', residenceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/subcontractors', subcontractorRoutes);
 app.get('/api/registrations/options', getResidenceOptions);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/appel-de-fonds', appelDeFondsRoutes);
 
 const PORT = process.env.PORT || 5000;
 

@@ -48,8 +48,7 @@ const connectDB = async () => {
     
     const shouldSync =
       process.env.DB_SYNC === 'true' ||
-      process.env.SYNC_DB === 'true' ||
-      process.env.NODE_ENV !== 'production';
+      process.env.SYNC_DB === 'true';
 
     if (shouldSync) {
       try {
@@ -59,7 +58,8 @@ const connectDB = async () => {
         if (syncError.name === 'SequelizeUnknownConstraintError' ||
             syncError.original?.code === 'ER_DUP_KEYNAME' ||
             syncError.original?.code === 'ER_DUP_FIELDNAME' ||
-            syncError.original?.code === 'ER_CANT_CREATE_TABLE') {
+            syncError.original?.code === 'ER_CANT_CREATE_TABLE' ||
+            syncError.original?.code === 'ER_TOO_MANY_KEYS') {
           console.warn('⚠️ Warning: Sync issue ignored (Constraint/Index/Column/FK). The server will continue starting.');
           console.warn(`Details: ${syncError.message}`);
         } else {
@@ -67,7 +67,7 @@ const connectDB = async () => {
         }
       }
     } else {
-      console.log('Database Sync skipped (production mode).');
+      console.log('Database Sync skipped (DB_SYNC/SYNC_DB disabled).');
     }
     
   } catch (error) {

@@ -11,6 +11,8 @@ const Subcontractor = require('./Subcontractor');
 const RegistrationRequest = require('./RegistrationRequest');
 const UserDevice = require('./UserDevice');
 const AuditLog = require('./AuditLog');
+const AppelDeFonds = require('./AppelDeFonds');
+const AppelDeFondsDocument = require('./AppelDeFondsDocument');
 
 // Define Associations
 
@@ -69,6 +71,16 @@ User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
 Residence.hasMany(Document, { foreignKey: 'residenceId' });
 Document.belongsTo(Residence, { foreignKey: 'residenceId' });
 
+// Residence <-> AppelDeFonds
+Residence.hasMany(AppelDeFonds, { foreignKey: 'residenceId', as: 'appelsDeFonds', constraints: false });
+AppelDeFonds.belongsTo(Residence, { foreignKey: 'residenceId', as: 'residence', constraints: false });
+
+// AppelDeFonds <-> Documents (via join table)
+AppelDeFonds.hasMany(AppelDeFondsDocument, { foreignKey: 'appelDeFondsId', as: 'documents' });
+AppelDeFondsDocument.belongsTo(AppelDeFonds, { foreignKey: 'appelDeFondsId', as: 'appelDeFonds', constraints: false });
+AppelDeFondsDocument.belongsTo(Document, { foreignKey: 'documentId', as: 'document', constraints: false });
+Document.hasMany(AppelDeFondsDocument, { foreignKey: 'documentId', as: 'appelDeFondsLinks' });
+
 module.exports = {
   User,
   Property,
@@ -83,4 +95,6 @@ module.exports = {
   RegistrationRequest,
   UserDevice,
   AuditLog,
+  AppelDeFonds,
+  AppelDeFondsDocument,
 };
