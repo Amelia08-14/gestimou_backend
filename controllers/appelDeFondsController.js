@@ -20,17 +20,34 @@ const computeDashboard = ({ queteRassemblee, coutReel }) => {
   };
 };
 
-const getOwnerCount = async (residenceId) => {
+const roundMoney2 = (n) => {
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 100) / 100;
+};
+
+const getSoldOwnerCount = async (residenceId) => {
   if (!residenceId) return 0;
   try {
-    return Property.count({
-      where: { residenceId: String(residenceId), ownerId: { [Op.ne]: null } },
+    const count = await Property.count({
+      where: { residenceId: String(residenceId), status: 'Vendu', ownerId: { [Op.ne]: null } },
       distinct: true,
       col: 'ownerId',
     });
+    if (Number.isInteger(count) && count > 0) return count;
+    const fallback = await Property.count({
+      where: { residenceId: String(residenceId), status: 'Vendu' },
+    });
+    return Number.isInteger(fallback) ? fallback : 0;
   } catch (_) {
     return 0;
   }
+};
+
+const computeQueteParProprietaire = async ({ residenceId, coutEstimeGlobal }) => {
+  const cost = toMoneyNumber(coutEstimeGlobal) ?? 0;
+  const ownerCount = await getSoldOwnerCount(residenceId);
+  if (!ownerCount || ownerCount <= 0) return { queteParProprietaire: 0, ownerCount };
+  return { queteParProprietaire: roundMoney2(cost / ownerCount), ownerCount };
 };
 
 const getOwnerEmailsForResidence = async (residenceId) => {
@@ -108,8 +125,8 @@ exports.getAppelsDeFonds = async (req, res) => {
     return res.json(
       appels.map((a) => ({
         ...a.toJSON(),
-        ownerCount: 0,
-        expectedTotal: 0,
+        ownerCount: null,
+        expectedTotal: null,
         dashboard: computeDashboard(a),
       }))
     );
@@ -156,7 +173,7 @@ exports.getAppelDeFondsById = async (req, res) => {
       }
     }
 
-    const ownerCount = await getOwnerCount(appel.residenceId);
+    const ownerCount = await getSoldOwnerCount(appel.residenceId);
     const perOwner = toMoneyNumber(appel.queteParProprietaire) ?? 0;
     const expectedTotal = ownerCount * perOwner;
 
@@ -186,7 +203,6 @@ exports.createAppelDeFonds = async (req, res) => {
       residenceId,
       probleme,
       coutEstimeGlobal,
-      queteParProprietaire,
       status,
     } = req.body || {};
 
@@ -196,11 +212,13 @@ exports.createAppelDeFonds = async (req, res) => {
       return res.status(400).json({ error: 'Champs requis: residenceId, probleme' });
     }
 
+    const computed = await computeQueteParProprietaire({ residenceId: rid, coutEstimeGlobal });
+
     const appel = await AppelDeFonds.create({
       residenceId: rid,
       probleme: pb,
       coutEstimeGlobal: toMoneyNumber(coutEstimeGlobal) ?? 0,
-      queteParProprietaire: toMoneyNumber(queteParProprietaire) ?? 0,
+      queteParProprietaire: computed.queteParProprietaire,
       status: String(status || 'DRAFT'),
       createdBy: req.user?.id != null ? String(req.user.id) : null,
     });
@@ -254,6 +272,17 @@ exports.updateAppelDeFonds = async (req, res) => {
           payload[field] = String(req.body[field] || '').trim();
         }
       }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'residenceId') || Object.prototype.hasOwnProperty.call(payload, 'coutEstimeGlobal')) {
+      const rid = Object.prototype.hasOwnProperty.call(payload, 'residenceId')
+        ? String(payload.residenceId || '').trim()
+        : String(appel.residenceId || '').trim();
+      const cost = Object.prototype.hasOwnProperty.call(payload, 'coutEstimeGlobal')
+        ? payload.coutEstimeGlobal
+        : appel.coutEstimeGlobal;
+      const computed = await computeQueteParProprietaire({ residenceId: rid, coutEstimeGlobal: cost });
+      payload.queteParProprietaire = computed.queteParProprietaire;
     }
 
     const nextStatus = Object.prototype.hasOwnProperty.call(payload, 'status')
