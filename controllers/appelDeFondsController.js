@@ -127,19 +127,34 @@ exports.getAppelsDeFonds = async (req, res) => {
 // @route   GET /api/appel-de-fonds/:id
 exports.getAppelDeFondsById = async (req, res) => {
   try {
-    const appel = await AppelDeFonds.findByPk(req.params.id, {
-      include: [
-        { model: Residence, as: 'residence', attributes: ['id', 'name', 'zone'] },
-        {
-          model: AppelDeFondsDocument,
-          as: 'documents',
-          include: [{ model: Document, as: 'document' }],
-          order: [['createdAt', 'DESC']],
-        },
-      ],
-    });
+    const appel = await AppelDeFonds.findByPk(req.params.id);
 
     if (!appel) return res.status(404).json({ error: 'Not found' });
+
+    let residence = null;
+    try {
+      residence = await Residence.findByPk(appel.residenceId, { attributes: ['id', 'name', 'zone'] });
+    } catch (_) {
+      residence = null;
+    }
+
+    let documents = [];
+    try {
+      documents = await AppelDeFondsDocument.findAll({
+        where: { appelDeFondsId: appel.id },
+        include: [{ model: Document, as: 'document', required: false }],
+        order: [['createdAt', 'DESC']],
+      });
+    } catch (_) {
+      try {
+        documents = await AppelDeFondsDocument.findAll({
+          where: { appelDeFondsId: appel.id },
+          order: [['createdAt', 'DESC']],
+        });
+      } catch (_) {
+        documents = [];
+      }
+    }
 
     const ownerCount = await getOwnerCount(appel.residenceId);
     const perOwner = toMoneyNumber(appel.queteParProprietaire) ?? 0;
@@ -147,6 +162,8 @@ exports.getAppelDeFondsById = async (req, res) => {
 
     res.json({
       ...appel.toJSON(),
+      residence: residence ? residence.toJSON() : null,
+      documents: Array.isArray(documents) ? documents.map((d) => d.toJSON()) : [],
       ownerCount,
       expectedTotal,
       dashboard: computeDashboard(appel),
@@ -211,9 +228,7 @@ exports.createAppelDeFonds = async (req, res) => {
 // @route   PUT /api/appel-de-fonds/:id
 exports.updateAppelDeFonds = async (req, res) => {
   try {
-    const appel = await AppelDeFonds.findByPk(req.params.id, {
-      include: [{ model: Residence, as: 'residence', attributes: ['id', 'name', 'zone'] }],
-    });
+    const appel = await AppelDeFonds.findByPk(req.params.id);
     if (!appel) return res.status(404).json({ error: 'Not found' });
 
     const previousStatus = String(appel.status || '');
@@ -256,7 +271,12 @@ exports.updateAppelDeFonds = async (req, res) => {
 
     let notified = 0;
     if (previousStatus !== 'PUBLISHED' && nextStatus === 'PUBLISHED') {
-      const residence = appel.residence || (await Residence.findByPk(appel.residenceId));
+      let residence = null;
+      try {
+        residence = await Residence.findByPk(appel.residenceId, { attributes: ['id', 'name', 'zone'] });
+      } catch (_) {
+        residence = null;
+      }
       const title = residence?.name
         ? `Appel de fonds - ${residence.name}`
         : 'Appel de fonds';
