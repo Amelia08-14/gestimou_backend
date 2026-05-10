@@ -239,7 +239,7 @@ exports.createTicket = async (req, res) => {
 
       if (existingTicket) {
         return res.status(409).json({ 
-          error: "Problème déjà signalé dans votre résidence il sera traité au plus vite" 
+          error: "Un autre ticket a été lancé dans votre résidence : attendez qu'il soit terminé pour signaler une autre panne" 
         });
       }
     }

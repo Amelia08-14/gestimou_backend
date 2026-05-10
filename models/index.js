@@ -9,6 +9,7 @@ const Reserve = require('./Reserve');
 const Notification = require('./Notification');
 const Subcontractor = require('./Subcontractor');
 const RegistrationRequest = require('./RegistrationRequest');
+const PropertyAddRequest = require('./PropertyAddRequest');
 const UserDevice = require('./UserDevice');
 const AuditLog = require('./AuditLog');
 const AppelDeFonds = require('./AppelDeFonds');
@@ -19,6 +20,9 @@ const AppelDeFondsDocument = require('./AppelDeFondsDocument');
 // User <-> UserDevice
 User.hasMany(UserDevice, { foreignKey: 'userId', as: 'devices' });
 UserDevice.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+User.hasMany(PropertyAddRequest, { foreignKey: 'userId', as: 'propertyAddRequests' });
+PropertyAddRequest.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 // RegistrationRequest <-> Residence (Optional, usually just ID string, but good for joins)
 // RegistrationRequest.belongsTo(Residence, { foreignKey: 'residenceId' });
@@ -93,6 +97,7 @@ module.exports = {
   Notification,
   Subcontractor,
   RegistrationRequest,
+  PropertyAddRequest,
   UserDevice,
   AuditLog,
   AppelDeFonds,
