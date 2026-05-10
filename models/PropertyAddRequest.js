@@ -34,6 +34,10 @@ const PropertyAddRequest = sequelize.define('PropertyAddRequest', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  requestedPropertyId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   status: {
     type: DataTypes.STRING,
     defaultValue: 'PENDING',

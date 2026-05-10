@@ -18,13 +18,25 @@ exports.submitPropertyAddRequest = async (req, res) => {
     if (user.role !== 'RESIDENT') return res.status(403).json({ error: 'Forbidden' });
 
     const residenceId = String(req.body?.residenceId || '').trim();
-    const floor = String(req.body?.floor || '').trim();
-    const block = String(req.body?.block || '').trim();
-    const door = String(req.body?.door || '').trim();
+    const propertyId = String(req.body?.propertyId || req.body?.requestedPropertyId || '').trim();
     const notes = String(req.body?.notes || '').trim();
 
     if (!residenceId) return res.status(400).json({ error: 'residenceId requis.' });
-    if (!door) return res.status(400).json({ error: "Numéro d'appartement requis." });
+    if (!propertyId) return res.status(400).json({ error: "Veuillez sélectionner un appartement." });
+
+    const property = await Property.findByPk(propertyId);
+    if (!property) return res.status(404).json({ error: "Bien introuvable." });
+    if (String(property.residenceId || '').trim() !== residenceId) {
+      return res.status(400).json({ error: "Bien invalide pour cette résidence." });
+    }
+    if (String(property.status || '').trim() !== 'Libre' || property.ownerId) {
+      return res.status(400).json({ error: "Ce bien n'est pas disponible." });
+    }
+
+    const floor = String(property.floor || '').trim();
+    const block = String(property.block || '').trim();
+    const door = apartmentNumberFromLotNumber(property.lotNumber);
+    if (!door) return res.status(400).json({ error: "Numéro d'appartement invalide." });
 
     const request = await PropertyAddRequest.create({
       userId: user.id,
@@ -33,6 +45,7 @@ exports.submitPropertyAddRequest = async (req, res) => {
       block: block || null,
       floor: floor || null,
       door,
+      requestedPropertyId: String(property.id),
       notes: notes || null,
       status: 'PENDING',
     });
@@ -54,7 +67,7 @@ exports.submitPropertyAddRequest = async (req, res) => {
       await Notification.create({
         userId: admin.id,
         title: 'Demande ajout de bien',
-        message: `Nouvelle demande d'ajout de bien de ${user.email} (résidence: ${residenceId}).`,
+        message: `Nouvelle demande d'ajout de bien de ${user.email} (résidence: ${residenceId}, appartement: ${door}).`,
         type: 'INFO',
       });
     }
@@ -62,9 +75,9 @@ exports.submitPropertyAddRequest = async (req, res) => {
     await writeAuditLog({
       req,
       action: 'Demande ajout de bien',
-      details: `Demande ajout de bien: ${user.email} résidence=${residenceId} apt=${door}`,
+      details: `Demande ajout de bien: ${user.email} résidence=${residenceId} property=${propertyId} apt=${door}`,
       user,
-      meta: { requestId: request.id, residenceId, door },
+      meta: { requestId: request.id, residenceId, door, propertyId },
     });
 
     res.status(201).json(request);
@@ -102,43 +115,18 @@ exports.approvePropertyAddRequest = async (req, res) => {
     const owner = email ? await Owner.findOne({ where: { email } }) : null;
     if (!owner) return res.status(400).json({ error: "Propriétaire introuvable pour cet email." });
 
-    const door = String(request.door || '').trim();
     const residenceId = String(request.residenceId || '').trim();
-    if (!door || !residenceId) return res.status(400).json({ error: 'Données de demande invalides.' });
+    const requestedPropertyId = String(request.requestedPropertyId || '').trim();
+    if (!requestedPropertyId || !residenceId) return res.status(400).json({ error: 'Données de demande invalides.' });
 
-    const where = {
-      residenceId,
-      [Op.or]: [
-        { status: 'Libre' },
-        { ownerId: null },
-      ],
-      [Op.and]: [
-        {
-          [Op.or]: [
-            { lotNumber: door },
-            { lotNumber: { [Op.like]: `%-${door}` } },
-          ],
-        },
-      ],
-    };
-
-    const block = String(request.block || '').trim();
-    const floor = String(request.floor || '').trim();
-    if (block) where.block = block;
-    if (floor) where.floor = floor;
-
-    let property = await Property.findOne({ where });
-    if (!property) {
-      property = await Property.findOne({
-        where: {
-          residenceId,
-          ownerId: null,
-          status: { [Op.ne]: 'Vendu' },
-        },
-      });
+    const property = await Property.findByPk(requestedPropertyId);
+    if (!property) return res.status(404).json({ error: "Bien demandé introuvable." });
+    if (String(property.residenceId || '').trim() !== residenceId) {
+      return res.status(400).json({ error: "Bien invalide pour cette résidence." });
     }
-
-    if (!property) return res.status(404).json({ error: "Aucun bien libre correspondant n'a été trouvé." });
+    if (String(property.status || '').trim() !== 'Libre' || property.ownerId) {
+      return res.status(400).json({ error: "Ce bien n'est plus disponible." });
+    }
 
     await property.update({ ownerId: owner.id, status: 'Vendu' });
 
@@ -214,4 +202,3 @@ exports.rejectPropertyAddRequest = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
-
