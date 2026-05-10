@@ -4,6 +4,7 @@ const { getNotifications, markAsRead, markAllAsRead, createNotification } = requ
 const { protect } = require('../middleware/authMiddleware');
 
 router.get('/', protect, getNotifications);
+router.get('/unread-count', protect, getUnreadCount);
 router.post('/', protect, createNotification); 
 router.put('/read-all', protect, markAllAsRead); // Must come before /:id/read to avoid conflict if :id catches "read-all"
 router.put('/:id/read', protect, markAsRead);

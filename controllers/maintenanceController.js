@@ -75,7 +75,15 @@ const PROBLEM_TYPES = [
 
 const isCoproTicketCategory = (category) => {
   const value = String(category || '');
-  return value.includes('Partie Commune') || value.startsWith('Copropriété');
+  // Presque tout sauf les tickets explicitement privés ou "Autres" non spécifiés
+  // On considère par défaut que les catégories thématiques sont pour la copropriété
+  const privateCategories = ['Autres']; 
+  return !privateCategories.includes(value);
+};
+
+const isPersonalIssueType = (title) => {
+  const value = String(title || '');
+  return value.includes("TAG d'accès");
 };
 
 const getResidentResidenceIds = async (email) => {
@@ -104,10 +112,14 @@ const canAccessTicket = async (user, ticketId) => {
   if (!user) return { ok: false, status: 401, error: 'Not authorized' };
 
   if (user.role === 'RESIDENT') {
-    const ownTicket = ticket.email && user.email && ticket.email === user.email;
+    const ownTicket = ticket.email && user.email && ticket.email.toLowerCase() === user.email.toLowerCase();
     if (!ownTicket) {
+      // Pour les tickets de copropriété
       const residenceIds = await getResidentResidenceIds(user.email);
-      const allowedCopro = residenceIds.includes(ticket.residenceId) && isCoproTicketCategory(ticket.category);
+      const isCopro = isCoproTicketCategory(ticket.category);
+      const isPersonal = isPersonalIssueType(ticket.title);
+      
+      const allowedCopro = residenceIds.includes(ticket.residenceId) && isCopro && !isPersonal;
       if (!allowedCopro) return { ok: false, status: 403, error: 'Forbidden' };
     }
   }
@@ -149,7 +161,10 @@ exports.getTickets = async (req, res) => {
             return res.status(403).json({ error: 'Forbidden' });
           }
           where.residenceId = residenceId;
-          where.category = { [Op.or]: [{ [Op.like]: '%Partie Commune%' }, { [Op.like]: 'Copropriété%' }] };
+          // Tout ce qui est copropriété (isCoproTicketCategory) 
+          // ET qui n'est pas personnel (isPersonalIssueType)
+          where.title = { [Op.notLike]: "%TAG d'accès%" };
+          // Note: On pourrait aussi filtrer par catégorie si on veut être plus précis
         } else {
           where.email = req.user.email;
         }
@@ -215,6 +230,25 @@ exports.getTicket = async (req, res) => {
 // @route   POST /api/maintenance
 exports.createTicket = async (req, res) => {
   try {
+    const { title, residenceId, category } = req.body;
+
+    // --- Duplicate Prevention for "Ascenseurs & Accès" ---
+    if (category === 'Ascenseurs & Accès' && title && !isPersonalIssueType(title) && residenceId) {
+      const existingTicket = await MaintenanceTicket.findOne({
+        where: {
+          residenceId,
+          title,
+          status: { [Op.not]: 'Terminé' }
+        }
+      });
+
+      if (existingTicket) {
+        return res.status(409).json({ 
+          error: "Problème déjà signalé dans votre résidence il sera traité au plus vite" 
+        });
+      }
+    }
+
     const rawDescription = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
     const safeDescription = rawDescription.slice(0, 100);
 

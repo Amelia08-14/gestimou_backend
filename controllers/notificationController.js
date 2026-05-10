@@ -19,6 +19,24 @@ exports.getNotifications = async (req, res) => {
   }
 };
 
+// @desc    Get unread notifications count
+// @route   GET /api/notifications/unread-count
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const count = await Notification.count({
+      where: {
+        userId: req.user.id,
+        isRead: false
+      }
+    });
+
+    res.json({ count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Mark notification as read
 // @route   PUT /api/notifications/:id/read
 exports.markAsRead = async (req, res) => {
