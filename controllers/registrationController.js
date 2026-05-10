@@ -264,7 +264,7 @@ exports.approveRequest = async (req, res) => {
             block: request.block || null,
             floor: request.floor || null,
             doorNumber: request.door || null,
-            status: 'Actif'
+            status: 'Non Actif'
         });
     } else {
         await owner.update({

@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Owner, Property, Residence, User } = require('../models');
+const { Owner, Property, Residence, User, Notification } = require('../models');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
@@ -164,6 +164,52 @@ exports.updateOwner = async (req, res) => {
     res.json(owner);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+};
+
+// @desc    Update owner status (Actif / Non Actif)
+// @route   PUT /api/owners/:id/status
+exports.updateOwnerStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!status || !['Actif', 'Non Actif'].includes(status)) {
+      return res.status(400).json({ error: 'Statut invalide. Utilisez "Actif" ou "Non Actif".' });
+    }
+
+    const owner = await Owner.findByPk(req.params.id);
+    if (!owner) return res.status(404).json({ error: 'Propriétaire non trouvé.' });
+
+    await owner.update({ status });
+
+    // Notify the user when their account is activated
+    if (status === 'Actif') {
+      const normalizedEmail = String(owner.email || '').trim().toLowerCase();
+      if (normalizedEmail) {
+        const user = await User.findOne({ where: { email: normalizedEmail } });
+        if (user) {
+          await Notification.create({
+            userId: user.id,
+            title: 'Compte activé',
+            message: 'Votre compte a été activé par l\'administration. Vous avez désormais accès à toutes les fonctionnalités.',
+            type: 'SUCCESS'
+          });
+        }
+      }
+    }
+
+    await writeAuditLog({
+      req,
+      action: status === 'Actif' ? 'Activation propriétaire' : 'Désactivation propriétaire',
+      details: `Propriétaire ${owner.firstName} ${owner.lastName} (${owner.email}) : ${status}`,
+      user: req.user,
+      meta: { ownerId: owner.id, status }
+    });
+
+    res.json({ message: `Propriétaire ${status === 'Actif' ? 'activé' : 'désactivé'}.`, owner });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur.' });
   }
 };
 

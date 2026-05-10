@@ -96,11 +96,13 @@ exports.getMyChargesSummary = async (req, res) => {
 
     const props = await Property.findAll({
       attributes: ['id', 'price'],
-      include: [{ model: Owner, as: 'owner', required: true, where: { email: String(user.email).toLowerCase() }, attributes: ['id', 'email'] }]
+      include: [{ model: Owner, as: 'owner', required: true, where: { email: String(user.email).toLowerCase() }, attributes: ['id', 'email', 'status'] }]
     });
     const propertyIds = props.map((p) => p.id);
+    const ownerStatus = props.length > 0 ? (props[0].owner?.status || 'Non Actif') : 'Non Actif';
+
     if (propertyIds.length === 0) {
-      return res.json({ status: 'Actif', nextPaymentDate: null, annualAmount: 15000 * 12, daysRemaining: null });
+      return res.json({ status: 'Non Actif', ownerStatus: 'Non Actif', nextPaymentDate: null, annualAmount: 0, daysRemaining: null, message: 'Votre compte est en attente d\'activation par l\'administration.' });
     }
 
     const charges = await FinancialTransaction.findAll({
@@ -156,7 +158,8 @@ exports.getMyChargesSummary = async (req, res) => {
     }
 
     res.json({
-      status: 'Actif',
+      status: ownerStatus,
+      ownerStatus,
       nextPaymentDate: due.toISOString(),
       annualAmount: 15000 * 12,
       daysRemaining
