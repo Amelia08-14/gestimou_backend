@@ -181,7 +181,6 @@ exports.updateOwnerStatus = async (req, res) => {
 
     await owner.update({ status });
 
-    // Notify the user when their account is activated
     if (status === 'Actif') {
       const normalizedEmail = String(owner.email || '').trim().toLowerCase();
       if (normalizedEmail) {

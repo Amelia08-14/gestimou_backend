@@ -75,8 +75,6 @@ const PROBLEM_TYPES = [
 
 const isCoproTicketCategory = (category) => {
   const value = String(category || '');
-  // Presque tout sauf les tickets explicitement privés ou "Autres" non spécifiés
-  // On considère par défaut que les catégories thématiques sont pour la copropriété
   const privateCategories = ['Autres']; 
   return !privateCategories.includes(value);
 };
@@ -161,10 +159,7 @@ exports.getTickets = async (req, res) => {
             return res.status(403).json({ error: 'Forbidden' });
           }
           where.residenceId = residenceId;
-          // Tout ce qui est copropriété (isCoproTicketCategory) 
-          // ET qui n'est pas personnel (isPersonalIssueType)
           where.title = { [Op.notLike]: "%TAG d'accès%" };
-          // Note: On pourrait aussi filtrer par catégorie si on veut être plus précis
         } else {
           where.email = req.user.email;
         }
@@ -388,11 +383,23 @@ exports.updateTicket = async (req, res) => {
       }
     }
 
+    const nextStatus = typeof patch.status === 'string' ? patch.status : ticket.status;
+    if (String(nextStatus || '').trim() !== 'Signalé') {
+      const nextResponsible = ('responsible' in patch) ? patch.responsible : ticket.responsible;
+      const nextAssignee = ('assignee' in patch) ? patch.assignee : ticket.assignee;
+      const nextSubcontractorId = ('subcontractorId' in patch) ? patch.subcontractorId : ticket.subcontractorId;
+      const assigned =
+        Boolean(String(nextResponsible || '').trim()) ||
+        Boolean(String(nextAssignee || '').trim()) ||
+        Boolean(String(nextSubcontractorId || '').trim());
+      if (!assigned) {
+        return res.status(400).json({ error: "Impossible de changer le statut tant qu'aucun intervenant ou responsable n'est affecté" });
+      }
+    }
+
     await ticket.update(patch);
 
-    // Notification if a subcontractor (Intervenant) is assigned
     if (ticket.subcontractorId && ticket.subcontractorId !== oldIntervenant) {
-        // Find if this subcontractor has a User account
         const subcontractor = await Subcontractor.findByPk(ticket.subcontractorId);
         if (subcontractor && subcontractor.email) {
             const user = await User.findOne({ where: { email: subcontractor.email } });
