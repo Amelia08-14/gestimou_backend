@@ -99,7 +99,7 @@ exports.getMyChargesSummary = async (req, res) => {
       include: [{ model: Owner, as: 'owner', required: true, where: { email: String(user.email).toLowerCase() }, attributes: ['id', 'email', 'status'] }]
     });
     const propertyIds = props.map((p) => p.id);
-    const ownerStatus = props.length > 0 ? (props[0].owner?.status || 'Non Actif') : 'Non Actif';
+    const owner = props.length > 0 ? props[0].owner : null;
 
     if (propertyIds.length === 0) {
       return res.json({ status: 'Non Actif', ownerStatus: 'Non Actif', nextPaymentDate: null, annualAmount: 0, daysRemaining: null, message: 'Votre compte est en attente d\'activation par l\'administration.' });
@@ -109,6 +109,15 @@ exports.getMyChargesSummary = async (req, res) => {
       where: { type: 'Charge', propertyId: { [Op.in]: propertyIds } },
       order: [['periodEnd', 'ASC']]
     });
+
+    const hasPaidCharge = charges.some((c) => String(c.status || '') === 'Payé');
+
+    // Auto-activate owner if they have at least one paid charge (heals old records too)
+    if (hasPaidCharge && owner && String(owner.status || '') !== 'Actif') {
+      try { await owner.update({ status: 'Actif' }); } catch (_) {}
+    }
+
+    const ownerStatus = hasPaidCharge ? 'Actif' : (owner?.status || 'Non Actif');
 
     const now = new Date();
     let nextUnpaid = null;
@@ -126,7 +135,7 @@ exports.getMyChargesSummary = async (req, res) => {
 
     const due = nextUnpaid || latestPaidEnd;
     if (!due) {
-      return res.json({ status: 'Actif', nextPaymentDate: null, annualAmount: 15000 * 12, daysRemaining: null });
+      return res.json({ status: 'Actif', ownerStatus: 'Actif', nextPaymentDate: null, annualAmount: 15000 * 12, daysRemaining: null });
     }
 
     const msLeft = due.getTime() - now.getTime();

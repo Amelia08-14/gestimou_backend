@@ -27,16 +27,26 @@ exports.submitPropertyAddRequest = async (req, res) => {
     const property = await Property.findByPk(propertyId);
     if (!property) return res.status(404).json({ error: "Bien introuvable." });
     if (String(property.residenceId || '').trim() !== residenceId) {
+      console.log(`[PropertyAddRequest] residenceId mismatch: property.residenceId="${property.residenceId}" submitted="${residenceId}"`);
       return res.status(400).json({ error: "Bien invalide pour cette résidence." });
     }
     if (String(property.status || '').trim() !== 'Libre' || property.ownerId) {
-      return res.status(400).json({ error: "Ce bien n'est pas disponible." });
+      console.log(`[PropertyAddRequest] not available: status="${property.status}" ownerId="${property.ownerId}"`);
+      return res.status(400).json({ error: "Ce bien n'est pas disponible (déjà attribué ou en cours de traitement)." });
+    }
+
+    // Prevent duplicate pending request for same property
+    const existingPending = await PropertyAddRequest.findOne({
+      where: { requestedPropertyId: String(propertyId), status: 'PENDING' }
+    });
+    if (existingPending) {
+      return res.status(400).json({ error: "Une demande est déjà en cours pour ce bien." });
     }
 
     const floor = String(property.floor || '').trim();
     const block = String(property.block || '').trim();
     const door = apartmentNumberFromLotNumber(property.lotNumber);
-    if (!door) return res.status(400).json({ error: "Numéro d'appartement invalide." });
+    if (!door) return res.status(400).json({ error: "Numéro d'appartement invalide (lotNumber manquant)." });
 
     const request = await PropertyAddRequest.create({
       userId: user.id,
