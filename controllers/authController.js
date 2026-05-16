@@ -107,6 +107,21 @@ exports.me = async (req, res) => {
   });
 };
 
+// @desc    Logout - remove current device from UserDevice table
+// @route   POST /api/auth/logout
+exports.logout = async (req, res) => {
+  try {
+    const { deviceId } = req.body || {};
+    if (req.user && deviceId) {
+      await UserDevice.destroy({ where: { userId: req.user.id, deviceId: String(deviceId) } });
+    }
+    res.json({ message: 'Déconnecté.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 exports.changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;

@@ -290,16 +290,20 @@ exports.createTicket = async (req, res) => {
     for (const admin of admins) {
         // Zone managers: only notify for their zone
         if (admin.role === 'RESPONSABLE_ZONE') {
-          if (!admin.zone) continue;
-          if (!createdResidence?.zone) continue;
-          if (admin.zone !== createdResidence.zone) continue;
+          const adminZone = String(admin.zone || '').trim().toLowerCase();
+          const residenceZone = String(createdResidence?.zone || '').trim().toLowerCase();
+          console.log(`[NOTIF] RESPONSABLE_ZONE ${admin.email}: adminZone="${adminZone}" residenceZone="${residenceZone}"`);
+          if (!adminZone) continue;
+          if (!residenceZone) continue;
+          if (adminZone !== residenceZone) continue;
         }
         // HSE: only notify for their zone (if set), otherwise notify for all
         if (admin.role === 'HSE') {
           const adminZone = String(admin.zone || '').trim();
           if (adminZone && adminZone.toUpperCase() !== 'ALL') {
-            if (!createdResidence?.zone) continue;
-            if (createdResidence.zone !== adminZone) continue;
+            const residenceZone = String(createdResidence?.zone || '').trim();
+            if (!residenceZone) continue;
+            if (residenceZone.toLowerCase() !== adminZone.toLowerCase()) continue;
           }
         }
 
@@ -449,15 +453,19 @@ exports.updateTicket = async (req, res) => {
 
       for (const adminUser of admins) {
         if (adminUser.role === 'RESPONSABLE_ZONE') {
-          if (!adminUser.zone) continue;
-          if (!residence?.zone) continue;
-          if (adminUser.zone !== residence.zone) continue;
+          const adminZone = String(adminUser.zone || '').trim().toLowerCase();
+          const residenceZone = String(residence?.zone || '').trim().toLowerCase();
+          console.log(`[NOTIF-UPDATE] RESPONSABLE_ZONE ${adminUser.email}: adminZone="${adminZone}" residenceZone="${residenceZone}"`);
+          if (!adminZone) continue;
+          if (!residenceZone) continue;
+          if (adminZone !== residenceZone) continue;
         }
         if (adminUser.role === 'HSE') {
           const adminZone = String(adminUser.zone || '').trim();
           if (adminZone && adminZone.toUpperCase() !== 'ALL') {
-            if (!residence?.zone) continue;
-            if (residence.zone !== adminZone) continue;
+            const residenceZone = String(residence?.zone || '').trim();
+            if (!residenceZone) continue;
+            if (residenceZone.toLowerCase() !== adminZone.toLowerCase()) continue;
           }
         }
 
