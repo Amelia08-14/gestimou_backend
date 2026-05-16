@@ -110,6 +110,20 @@ const PORT = process.env.PORT || 5000;
 
 (async () => {
   await connectDB();
+
+  // Ensure tables added after initial DB sync exist (safe: only creates, never drops)
+  try {
+    const { PropertyAddRequest, UserDevice, AuditLog } = require('./models');
+    await Promise.all([
+      PropertyAddRequest.sync(),
+      UserDevice.sync(),
+      AuditLog.sync(),
+    ]);
+    console.log('Model tables verified/created.');
+  } catch (e) {
+    console.warn('Warning: table sync on startup failed:', e.message);
+  }
+
   app.listen(PORT, () => {
     console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   });

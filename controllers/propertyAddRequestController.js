@@ -64,26 +64,34 @@ exports.submitPropertyAddRequest = async (req, res) => {
       status: 'PENDING',
     });
 
-    const admins = await User.findAll({
-      where: { role: { [Op.in]: ['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE'] } },
-      attributes: ['id', 'role', 'zone'],
-    });
-
-    const residence = await Residence.findByPk(residenceId).catch(() => null);
-
-    for (const admin of admins) {
-      if (admin.role === 'RESPONSABLE_ZONE') {
-        const adminZone = String(admin.zone || '').trim();
-        const resZone = String(residence?.zone || '').trim();
-        if (adminZone && adminZone.toUpperCase() !== 'ALL' && (!resZone || adminZone !== resZone)) continue;
-      }
-
-      await Notification.create({
-        userId: admin.id,
-        title: 'Demande ajout de bien',
-        message: `Nouvelle demande d'ajout de bien de ${user.email} (résidence: ${residenceId}, appartement: ${door}).`,
-        type: 'INFO',
+    try {
+      const admins = await User.findAll({
+        where: { role: { [Op.in]: ['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE'] } },
+        attributes: ['id', 'role', 'zone'],
       });
+
+      const residence = await Residence.findByPk(residenceId).catch(() => null);
+
+      for (const admin of admins) {
+        try {
+          if (admin.role === 'RESPONSABLE_ZONE') {
+            const adminZone = String(admin.zone || '').trim();
+            const resZone = String(residence?.zone || '').trim();
+            if (adminZone && adminZone.toUpperCase() !== 'ALL' && (!resZone || adminZone !== resZone)) continue;
+          }
+
+          await Notification.create({
+            userId: admin.id,
+            title: 'Demande ajout de bien',
+            message: `Nouvelle demande d'ajout de bien de ${user.email} (résidence: ${residenceId}, appartement: ${door}).`,
+            type: 'INFO',
+          });
+        } catch (notifErr) {
+          console.error('[PropertyAddRequest] Failed to notify admin', admin.id, notifErr?.message);
+        }
+      }
+    } catch (notifLoopErr) {
+      console.error('[PropertyAddRequest] Notification loop error:', notifLoopErr?.message);
     }
 
     await writeAuditLog({
@@ -96,6 +104,7 @@ exports.submitPropertyAddRequest = async (req, res) => {
 
     res.status(201).json(request);
   } catch (err) {
+    console.error('[PropertyAddRequest] submitPropertyAddRequest error:', err?.message || err);
     res.status(500).json({ error: 'Server Error' });
   }
 };
