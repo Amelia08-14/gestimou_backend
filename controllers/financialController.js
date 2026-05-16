@@ -259,9 +259,16 @@ exports.updateTransaction = async (req, res) => {
     if (oldStatus !== 'Payé' && newStatus === 'Payé' && transaction.propertyId) {
       try {
         const property = await Property.findByPk(transaction.propertyId, {
-          include: [{ model: Owner, as: 'owner', required: false, attributes: ['id', 'email'] }]
+          include: [{ model: Owner, as: 'owner', required: false, attributes: ['id', 'email', 'status'] }]
         });
-        const ownerEmail = property?.owner?.email;
+        const owner = property?.owner;
+        const ownerEmail = owner?.email;
+
+        // Auto-activate owner when they pay their first charge
+        if (owner && owner.status !== 'Actif') {
+          await owner.update({ status: 'Actif' });
+        }
+
         if (ownerEmail) {
           const user = await User.findOne({ where: { email: String(ownerEmail).toLowerCase() } });
           if (user) {
