@@ -212,15 +212,42 @@ exports.updateOwnerStatus = async (req, res) => {
   }
 };
 
-// @desc    Delete owner
+// @desc    Delete owner, free their properties and remove associated user account
 // @route   DELETE /api/owners/:id
 exports.deleteOwner = async (req, res) => {
   try {
-    const owner = await Owner.findByPk(req.params.id);
+    const owner = await Owner.findByPk(req.params.id, {
+      include: [{ model: Property }]
+    });
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
+
+    // Free all properties linked to this owner
+    const properties = owner.Properties || [];
+    for (const property of properties) {
+      await property.update({ ownerId: null, status: 'Libre' });
+    }
+
+    // Delete the linked RESIDENT user account
+    const email = String(owner.email || '').trim().toLowerCase();
+    if (email) {
+      const linkedUser = await User.findOne({ where: { email, role: 'RESIDENT' } });
+      if (linkedUser) {
+        await linkedUser.destroy();
+      }
+    }
+
+    await writeAuditLog({
+      req,
+      action: 'Suppression propriétaire',
+      details: `Propriétaire supprimé: ${owner.firstName} ${owner.lastName} (${owner.email}) - ${properties.length} bien(s) libéré(s)`,
+      user: req.user,
+      meta: { ownerId: owner.id, freedProperties: properties.map((p) => p.id) }
+    });
+
     await owner.destroy();
-    res.json({ message: 'Owner removed' });
+    res.json({ message: 'Propriétaire supprimé, biens libérés et compte utilisateur supprimé.', freedCount: properties.length });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server Error' });
   }
 };

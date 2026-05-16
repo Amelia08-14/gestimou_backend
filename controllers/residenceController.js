@@ -32,9 +32,12 @@ exports.getResidences = async (req, res) => {
             return res.status(403).json({ error: 'Forbidden' });
         }
         if (req.user.role === 'RESIDENT') {
-            const owner = await Owner.findOne({ where: { email: req.user.email } });
-            if (!owner || !owner.residenceId) return res.json([]);
-            where.id = owner.residenceId;
+            // scope=property_request: show all residences so the resident can request a property in any residence
+            if (String(req.query.scope || '') !== 'property_request') {
+                const owner = await Owner.findOne({ where: { email: req.user.email } });
+                if (!owner || !owner.residenceId) return res.json([]);
+                where.id = owner.residenceId;
+            }
         }
         if (req.user.role === 'RESPONSABLE_ZONE') {
             const zone = String(req.user.zone || '').trim();

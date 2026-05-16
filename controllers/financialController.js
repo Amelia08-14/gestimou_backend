@@ -251,10 +251,87 @@ exports.updateTransaction = async (req, res) => {
   try {
     const transaction = await FinancialTransaction.findByPk(req.params.id);
     if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+
+    const oldStatus = String(transaction.status || '');
     await transaction.update(req.body);
+    const newStatus = String(transaction.status || '');
+
+    if (oldStatus !== 'Payé' && newStatus === 'Payé' && transaction.propertyId) {
+      try {
+        const property = await Property.findByPk(transaction.propertyId, {
+          include: [{ model: Owner, as: 'owner', required: false, attributes: ['id', 'email'] }]
+        });
+        const ownerEmail = property?.owner?.email;
+        if (ownerEmail) {
+          const user = await User.findOne({ where: { email: String(ownerEmail).toLowerCase() } });
+          if (user) {
+            await Notification.create({
+              userId: user.id,
+              title: 'Paiement confirmé',
+              message: `Votre charge "${transaction.description || 'Charge'}" a été marquée comme payée.`,
+              type: 'SUCCESS'
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
     res.json(transaction);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+};
+
+// @desc    Get resident's own charges list
+// @route   GET /api/financial/my-charges
+exports.getMyCharges = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Not authorized' });
+    if (user.role !== 'RESIDENT') return res.status(403).json({ error: 'Forbidden' });
+
+    const props = await Property.findAll({
+      attributes: ['id', 'title', 'lotNumber', 'block', 'floor'],
+      include: [{
+        model: Owner, as: 'owner', required: true,
+        where: { email: String(user.email).toLowerCase() },
+        attributes: ['id', 'email']
+      }]
+    });
+
+    if (props.length === 0) {
+      return res.json([]);
+    }
+
+    const propertyIds = props.map((p) => p.id);
+    const propertyMap = new Map(props.map((p) => [p.id, p]));
+
+    const charges = await FinancialTransaction.findAll({
+      where: { type: 'Charge', propertyId: { [Op.in]: propertyIds } },
+      order: [['periodEnd', 'DESC']],
+      include: [{ model: Residence, attributes: ['id', 'name'] }]
+    });
+
+    const result = charges.map((c) => {
+      const prop = propertyMap.get(c.propertyId);
+      return {
+        id: c.id,
+        description: c.description,
+        amount: c.amount,
+        status: c.status,
+        date: c.date,
+        periodStart: c.periodStart,
+        periodEnd: c.periodEnd,
+        residenceName: c.Residence?.name || c.residenceId || '',
+        propertyTitle: prop?.title || '',
+        propertyLot: prop?.lotNumber || ''
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server Error' });
   }
 };
 

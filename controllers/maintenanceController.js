@@ -280,25 +280,33 @@ exports.createTicket = async (req, res) => {
       }
     }
 
-    // Notification for Managers/Admins when a ticket is created
-    const admins = await User.findAll({ 
-        where: { 
-            role: { [Op.in]: ['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE'] }
-        } 
+    // Notification for Managers/Admins/Zone-Managers/HSE when a ticket is created
+    const admins = await User.findAll({
+        where: {
+            role: { [Op.in]: ['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE', 'HSE'] }
+        }
     });
 
     for (const admin of admins) {
-        // Skip if zone manager but different zone
+        // Zone managers: only notify for their zone
         if (admin.role === 'RESPONSABLE_ZONE') {
           if (!admin.zone) continue;
           if (!createdResidence?.zone) continue;
           if (admin.zone !== createdResidence.zone) continue;
         }
+        // HSE: only notify for their zone (if set), otherwise notify for all
+        if (admin.role === 'HSE') {
+          const adminZone = String(admin.zone || '').trim();
+          if (adminZone && adminZone.toUpperCase() !== 'ALL') {
+            if (!createdResidence?.zone) continue;
+            if (createdResidence.zone !== adminZone) continue;
+          }
+        }
 
         await Notification.create({
             userId: admin.id,
             title: 'Nouveau ticket de maintenance',
-            message: `Un nouveau ticket "${ticket.title}" a été créé pour la résidence ${ticket.residenceId || 'Non spécifiée'}.`,
+            message: `Un nouveau ticket "${ticket.title}" a été créé pour la résidence ${createdResidence?.name || ticket.residenceId || 'Non spécifiée'}.`,
             type: 'WARNING'
         });
     }
@@ -430,12 +438,12 @@ exports.updateTicket = async (req, res) => {
       }
     }
 
-    // Notify admins/managers/zone managers when status changes
+    // Notify admins/managers/zone managers/HSE when status changes
     if (before.status !== after.status) {
       const residence = ticket.residenceId ? await Residence.findByPk(ticket.residenceId) : null;
       const admins = await User.findAll({
         where: {
-          role: { [Op.in]: ['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE'] }
+          role: { [Op.in]: ['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE', 'HSE'] }
         }
       });
 
@@ -444,6 +452,13 @@ exports.updateTicket = async (req, res) => {
           if (!adminUser.zone) continue;
           if (!residence?.zone) continue;
           if (adminUser.zone !== residence.zone) continue;
+        }
+        if (adminUser.role === 'HSE') {
+          const adminZone = String(adminUser.zone || '').trim();
+          if (adminZone && adminZone.toUpperCase() !== 'ALL') {
+            if (!residence?.zone) continue;
+            if (residence.zone !== adminZone) continue;
+          }
         }
 
         await Notification.create({
