@@ -24,7 +24,8 @@ exports.getResidenceOptions = async (req, res) => {
     const properties = await Property.findAll({
       where: {
         residenceId,
-        status: 'Libre'
+        status: 'Libre',
+        ownerId: null
       },
       attributes: ['id', 'floor', 'block', 'lotNumber', 'status', 'residenceId'],
       order: [

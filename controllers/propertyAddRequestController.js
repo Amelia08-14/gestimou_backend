@@ -30,9 +30,13 @@ exports.submitPropertyAddRequest = async (req, res) => {
       console.log(`[PropertyAddRequest] residenceId mismatch: property.residenceId="${property.residenceId}" submitted="${residenceId}"`);
       return res.status(400).json({ error: "Bien invalide pour cette résidence." });
     }
-    if (String(property.status || '').trim() !== 'Libre' || property.ownerId) {
+    if (String(property.status || '').trim() !== 'Libre') {
       console.log(`[PropertyAddRequest] not available: status="${property.status}" ownerId="${property.ownerId}"`);
-      return res.status(400).json({ error: "Ce bien n'est pas disponible (déjà attribué ou en cours de traitement)." });
+      return res.status(400).json({ error: "Ce bien n'est plus disponible." });
+    }
+    if (property.ownerId) {
+      console.log(`[PropertyAddRequest] has owner: status="${property.status}" ownerId="${property.ownerId}"`);
+      return res.status(400).json({ error: "Ce bien appartient déjà à un propriétaire." });
     }
 
     // Prevent duplicate pending request for same property
