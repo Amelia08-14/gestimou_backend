@@ -21,12 +21,15 @@ exports.getResidenceOptions = async (req, res) => {
       return res.status(400).json({ success: false, error: 'residenceId requis.' });
     }
 
+    // forPropertyRequest=true: only show properties with no existing owner (strict check)
+    // Registration (default): show all Libre properties so residents can claim their apartment
+    const whereClause = { residenceId, status: 'Libre' };
+    if (req.query.forPropertyRequest === 'true') {
+      whereClause.ownerId = null;
+    }
+
     const properties = await Property.findAll({
-      where: {
-        residenceId,
-        status: 'Libre',
-        ownerId: null
-      },
+      where: whereClause,
       attributes: ['id', 'floor', 'block', 'lotNumber', 'status', 'residenceId'],
       order: [
         ['floor', 'ASC'],
@@ -45,7 +48,8 @@ exports.getResidenceOptions = async (req, res) => {
       }))
       .filter((u) => Boolean(u.apartmentNumber));
 
-    const floors = Array.from(new Set(units.map((u) => String(u.floor || '').trim()).filter(Boolean)));
+    // Include empty string for apartments without a floor (shown as "Rez-de-chaussée" in UI)
+    const floors = Array.from(new Set(units.map((u) => String(u.floor || '').trim())));
 
     res.json({ success: true, data: { floors, units } });
   } catch (err) {
