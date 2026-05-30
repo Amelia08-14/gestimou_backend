@@ -7,7 +7,8 @@ const {
   createUser,
   updateUser,
   deleteUser,
-  resetUserPassword
+  resetUserPassword,
+  resetUserDevices
 } = require('../controllers/userController');
 
 router.route('/')
@@ -21,5 +22,8 @@ router.route('/:id')
 
 router.route('/:id/reset-password')
   .post(protect, authorizeRoles('ADMIN'), resetUserPassword);
+
+router.route('/:id/reset-devices')
+  .delete(protect, authorizeRoles('ADMIN'), resetUserDevices);
 
 module.exports = router;

@@ -1,4 +1,4 @@
-const { User } = require('../models');
+const { User, UserDevice } = require('../models');
 const bcrypt = require('bcryptjs');
 const { writeAuditLog } = require('../utils/auditLog');
 const crypto = require('crypto');
@@ -227,6 +227,28 @@ L'équipe Gestimou.`;
       meta: { resetUserId: user.id, emailSent }
     });
   } catch (err) {
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+exports.resetUserDevices = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+
+    const deleted = await UserDevice.destroy({ where: { userId: user.id } });
+
+    await writeAuditLog({
+      req,
+      action: 'Réinitialisation appareils',
+      details: `Appareils réinitialisés pour: ${user.email} (${deleted} supprimés)`,
+      user: req.user,
+      meta: { resetUserId: user.id, devicesDeleted: deleted }
+    });
+
+    res.json({ message: `Appareils réinitialisés (${deleted} supprimé(s)).`, devicesDeleted: deleted });
+  } catch (err) {
+    console.error('[resetUserDevices]', err);
     res.status(500).json({ error: 'Server Error' });
   }
 };
