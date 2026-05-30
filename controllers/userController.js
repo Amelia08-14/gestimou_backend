@@ -101,24 +101,29 @@ exports.getUser = async (req, res) => {
 exports.createUser = async (req, res) => {
   try {
     const { name, email, password, role, profession, zone } = req.body;
-    
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password || '123456', 10);
-    
+
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail) return res.status(400).json({ error: 'Email requis.' });
+    if (!name || !String(name).trim()) return res.status(400).json({ error: 'Nom requis.' });
+
+    const existing = await User.findOne({ where: { email: normalizedEmail } });
+    if (existing) return res.status(400).json({ error: `Un compte existe déjà avec l'email ${normalizedEmail}.` });
+
+    const hashedPassword = await bcrypt.hash(password || 'password123', 10);
+
     const user = await User.create({
-      name,
-      email,
+      name: String(name).trim(),
+      email: normalizedEmail,
       password: hashedPassword,
-      role,
-      profession,
-      zone,
+      role: role || 'RESIDENT',
+      profession: profession || null,
+      zone: zone || null,
       mustChangePassword: true
     });
-    
-    // Don't return password
+
     const userJson = user.toJSON();
     delete userJson.password;
-    
+
     res.status(201).json(userJson);
 
     await writeAuditLog({
@@ -129,7 +134,11 @@ exports.createUser = async (req, res) => {
       meta: { createdUserId: user.id }
     });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('[createUser]', err?.message);
+    if (err?.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ error: 'Un compte existe déjà avec cet email.' });
+    }
+    res.status(400).json({ error: err.message || 'Erreur lors de la création.' });
   }
 };
 

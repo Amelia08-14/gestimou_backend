@@ -9,7 +9,7 @@ const PROBLEM_TYPES = [
     category: 'Peinture (Partie Commune)',
     items: [
       'Retouches peinture couloir',
-      'Peinture écaillée',
+      'Peinture escaliers',
       "Traces d'humidité",
       'Autre problème de peinture'
     ]
