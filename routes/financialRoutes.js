@@ -17,11 +17,11 @@ router.get('/my-charges-summary', protect, authorizeRoles('RESIDENT'), getMyChar
 router.get('/my-charges', protect, authorizeRoles('RESIDENT'), getMyCharges);
 
 router.route('/')
-  .get(protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), getTransactions)
+  .get(protect, authorizeRoles('ADMIN', 'RECOUVREMENT', 'GESTIONNAIRE_TAG'), getTransactions)
   .post(protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), createTransaction);
 
 router.route('/:id')
-  .get(protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), getTransaction)
+  .get(protect, authorizeRoles('ADMIN', 'RECOUVREMENT', 'GESTIONNAIRE_TAG'), getTransaction)
   .put(protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), updateTransaction)
   .delete(protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), deleteTransaction);
 

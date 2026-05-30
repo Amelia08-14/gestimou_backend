@@ -14,6 +14,7 @@ const UserDevice = require('./UserDevice');
 const AuditLog = require('./AuditLog');
 const AppelDeFonds = require('./AppelDeFonds');
 const AppelDeFondsDocument = require('./AppelDeFondsDocument');
+const Tag = require('./Tag');
 
 // Define Associations
 
@@ -102,4 +103,5 @@ module.exports = {
   AuditLog,
   AppelDeFonds,
   AppelDeFondsDocument,
+  Tag,
 };

@@ -289,6 +289,26 @@ exports.updateTransaction = async (req, res) => {
             });
           }
         }
+
+        // Notify GESTIONNAIRE_TAG users so they know a resident paid and may need a TAG activation
+        const tagManagers = await User.findAll({
+          where: { role: 'GESTIONNAIRE_TAG' },
+          attributes: ['id'],
+        });
+        if (tagManagers.length > 0) {
+          const residence = transaction.residenceId
+            ? await Residence.findByPk(transaction.residenceId, { attributes: ['name'] }).catch(() => null)
+            : null;
+          const resName = residence?.name ? ` (${residence.name})` : '';
+          for (const tm of tagManagers) {
+            await Notification.create({
+              userId: tm.id,
+              title: 'Charge payée — TAG à vérifier',
+              message: `${ownerEmail || 'Un résident'}${resName} a payé "${transaction.description || 'Charge'}". Vérifier l'activation du TAG si nécessaire.`,
+              type: 'INFO',
+            });
+          }
+        }
       } catch (_) {}
     }
 

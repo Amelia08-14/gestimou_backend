@@ -85,6 +85,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const auditLogRoutes = require('./routes/auditLogRoutes');
 const subcontractorRoutes = require('./routes/subcontractorRoutes');
 const appelDeFondsRoutes = require('./routes/appelDeFondsRoutes');
+const tagRoutes = require('./routes/tagRoutes');
 const { startAnnualChargesScheduler } = require('./jobs/annualChargesScheduler');
 
 // Mount routers
@@ -105,6 +106,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/appel-de-fonds', appelDeFondsRoutes);
+app.use('/api/tags', tagRoutes);
 
 const PORT = process.env.PORT || 5000;
 
@@ -113,11 +115,12 @@ const PORT = process.env.PORT || 5000;
 
   // Ensure tables added after initial DB sync exist (safe: only creates, never drops)
   try {
-    const { PropertyAddRequest, UserDevice, AuditLog } = require('./models');
+    const { PropertyAddRequest, UserDevice, AuditLog, Tag } = require('./models');
     await Promise.all([
       PropertyAddRequest.sync(),
       UserDevice.sync(),
       AuditLog.sync(),
+      Tag.sync(),
     ]);
     console.log('Model tables verified/created.');
   } catch (e) {

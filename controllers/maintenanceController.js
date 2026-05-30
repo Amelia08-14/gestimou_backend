@@ -136,7 +136,8 @@ const canAccessTicket = async (user, ticketId) => {
     const zone = String(user.zone || '').trim();
     if (zone && !isAllZones(zone)) {
       const ticketZone = String(ticket.residence?.zone || '').trim();
-      if (!ticketZone || ticketZone !== zone) return { ok: false, status: 403, error: 'Forbidden' };
+      // Only block if residence zone is known AND doesn't match
+      if (ticketZone && ticketZone !== zone) return { ok: false, status: 403, error: 'Forbidden' };
     }
   }
 
@@ -293,9 +294,8 @@ exports.createTicket = async (req, res) => {
           const adminZone = String(admin.zone || '').trim().toLowerCase();
           const residenceZone = String(createdResidence?.zone || '').trim().toLowerCase();
           console.log(`[NOTIF] RESPONSABLE_ZONE ${admin.email}: adminZone="${adminZone}" residenceZone="${residenceZone}"`);
-          if (!adminZone) continue;
-          if (!residenceZone) continue;
-          if (adminZone !== residenceZone) continue;
+          // Only skip when both zones are known AND they don't match
+          if (adminZone && residenceZone && adminZone !== residenceZone) continue;
         }
         // HSE: only notify for their zone (if set), otherwise notify for all
         if (admin.role === 'HSE') {
@@ -456,9 +456,8 @@ exports.updateTicket = async (req, res) => {
           const adminZone = String(adminUser.zone || '').trim().toLowerCase();
           const residenceZone = String(residence?.zone || '').trim().toLowerCase();
           console.log(`[NOTIF-UPDATE] RESPONSABLE_ZONE ${adminUser.email}: adminZone="${adminZone}" residenceZone="${residenceZone}"`);
-          if (!adminZone) continue;
-          if (!residenceZone) continue;
-          if (adminZone !== residenceZone) continue;
+          // Only skip when both zones are known AND they don't match
+          if (adminZone && residenceZone && adminZone !== residenceZone) continue;
         }
         if (adminUser.role === 'HSE') {
           const adminZone = String(adminUser.zone || '').trim();
