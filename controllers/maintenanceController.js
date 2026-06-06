@@ -294,8 +294,8 @@ exports.createTicket = async (req, res) => {
           const adminZone = String(admin.zone || '').trim().toLowerCase();
           const residenceZone = String(createdResidence?.zone || '').trim().toLowerCase();
           console.log(`[NOTIF] RESPONSABLE_ZONE ${admin.email}: adminZone="${adminZone}" residenceZone="${residenceZone}"`);
-          // Only skip when both zones are known AND they don't match
-          if (adminZone && residenceZone && adminZone !== residenceZone) continue;
+          // Only skip if admin zone is specific (not ALL) AND residence zone is known AND they don't match
+          if (adminZone && !isAllZones(adminZone) && residenceZone && adminZone !== residenceZone) continue;
         }
         // HSE: only notify for their zone (if set), otherwise notify for all
         if (admin.role === 'HSE') {
@@ -456,8 +456,8 @@ exports.updateTicket = async (req, res) => {
           const adminZone = String(adminUser.zone || '').trim().toLowerCase();
           const residenceZone = String(residence?.zone || '').trim().toLowerCase();
           console.log(`[NOTIF-UPDATE] RESPONSABLE_ZONE ${adminUser.email}: adminZone="${adminZone}" residenceZone="${residenceZone}"`);
-          // Only skip when both zones are known AND they don't match
-          if (adminZone && residenceZone && adminZone !== residenceZone) continue;
+          // Only skip if admin zone is specific (not ALL) AND residence zone is known AND they don't match
+          if (adminZone && !isAllZones(adminZone) && residenceZone && adminZone !== residenceZone) continue;
         }
         if (adminUser.role === 'HSE') {
           const adminZone = String(adminUser.zone || '').trim();
