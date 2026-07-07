@@ -88,6 +88,36 @@ const appelDeFondsRoutes = require('./routes/appelDeFondsRoutes');
 const tagRoutes = require('./routes/tagRoutes');
 const { startAnnualChargesScheduler } = require('./jobs/annualChargesScheduler');
 
+const ensureMaintenanceTicketColumns = async () => {
+  const { sequelize } = require('./config/db');
+  const { DataTypes } = require('sequelize');
+  const table = await sequelize.getQueryInterface().describeTable('MaintenanceTicket');
+  const columns = {
+    responsible: { type: DataTypes.STRING, allowNull: true },
+    subcontractorId: { type: DataTypes.UUID, allowNull: true },
+    interventionDate: { type: DataTypes.DATE, allowNull: true },
+    deadline: { type: DataTypes.DATE, allowNull: true },
+    cost: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
+    paymentStatus: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: 'Non facturé',
+    },
+    attachmentUrl: { type: DataTypes.STRING, allowNull: true },
+    attachmentName: { type: DataTypes.STRING, allowNull: true },
+    attachmentType: { type: DataTypes.STRING, allowNull: true },
+    attachmentSize: { type: DataTypes.INTEGER, allowNull: true },
+    rejectionReason: { type: DataTypes.STRING, allowNull: true },
+  };
+
+  for (const [name, definition] of Object.entries(columns)) {
+    if (!table[name]) {
+      await sequelize.getQueryInterface().addColumn('MaintenanceTicket', name, definition);
+      console.log(`MaintenanceTicket.${name} column added.`);
+    }
+  }
+};
+
 // Mount routers
 app.use('/api/properties', propertyRoutes);
 app.use('/api/financial', financialRoutes);
@@ -122,6 +152,7 @@ const PORT = process.env.PORT || 5000;
       AuditLog.sync(),
       Tag.sync(),
     ]);
+    await ensureMaintenanceTicketColumns();
     console.log('Model tables verified/created.');
   } catch (e) {
     console.warn('Warning: table sync on startup failed:', e.message);
