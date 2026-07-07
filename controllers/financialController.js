@@ -231,6 +231,37 @@ exports.generateAnnualCharges = async (req, res) => {
 exports.generateMonthlyCharges = exports.generateAnnualCharges;
 exports.generateAnnualChargesInternal = generateAnnualChargesInternal;
 
+// @desc    Get client charge status by email (for admin/zone managers reviewing tickets)
+// @route   GET /api/financial/client-status?email=xxx
+exports.getClientChargeStatus = async (req, res) => {
+  try {
+    const email = String(req.query.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Email requis' });
+
+    const owner = await Owner.findOne({ where: { email } });
+    if (!owner) return res.json({ status: 'Inconnu', unpaid: 0, total: 0 });
+
+    const properties = await Property.findAll({
+      where: { ownerId: owner.id },
+      attributes: ['id'],
+    });
+    const propertyIds = properties.map((p) => p.id);
+    if (propertyIds.length === 0) return res.json({ status: 'Aucune propriété', unpaid: 0, total: 0 });
+
+    const charges = await FinancialTransaction.findAll({
+      where: { propertyId: propertyIds, type: 'Charge' },
+      attributes: ['status'],
+    });
+
+    const total = charges.length;
+    const unpaid = charges.filter((c) => c.status !== 'Payé').length;
+    const status = unpaid > 0 ? 'Impayé' : (total > 0 ? 'Payé' : 'Aucune charge');
+    res.json({ status, unpaid, total });
+  } catch (err) {
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Get single transaction
 // @route   GET /api/financial/:id
 exports.getTransaction = async (req, res) => {

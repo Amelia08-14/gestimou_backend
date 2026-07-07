@@ -68,6 +68,14 @@ const PROBLEM_TYPES = [
     ]
   },
   {
+    category: 'Commande TAG d\'accès',
+    items: ['Demande de TAG d\'accès']
+  },
+  {
+    category: 'Commande Télécommande Parking',
+    items: ['Demande de télécommande parking']
+  },
+  {
     category: 'Autres',
     items: ['Autres']
   }
@@ -347,7 +355,36 @@ exports.updateTicket = async (req, res) => {
 
     const patch = {};
 
-    if (typeof req.body?.status === 'string') patch.status = req.body.status;
+    // Role-based status restrictions
+    if (typeof req.body?.status === 'string') {
+      const newStatus = req.body.status;
+
+      // INTERVENANT can only set status to "En cours"
+      if (user.role === 'INTERVENANT' && newStatus !== 'En cours') {
+        return res.status(403).json({ error: 'Un intervenant peut uniquement mettre le statut à "En cours"' });
+      }
+
+      // Only ADMIN or RESPONSABLE_ZONE can set status to "Terminé"
+      if (newStatus === 'Terminé' && user.role !== 'ADMIN' && user.role !== 'RESPONSABLE_ZONE') {
+        return res.status(403).json({ error: 'Seul un administrateur ou responsable de zone peut clôturer un ticket' });
+      }
+
+      // Only ADMIN or RESPONSABLE_ZONE can reject a ticket
+      if (newStatus === 'Rejeté' && user.role !== 'ADMIN' && user.role !== 'RESPONSABLE_ZONE') {
+        return res.status(403).json({ error: 'Seul un administrateur ou responsable de zone peut rejeter un ticket' });
+      }
+
+      patch.status = newStatus;
+    }
+
+    // Rejection reason
+    if (typeof req.body?.rejectionReason === 'string') {
+      if (user.role !== 'ADMIN' && user.role !== 'RESPONSABLE_ZONE') {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      patch.rejectionReason = req.body.rejectionReason;
+    }
+
     if (typeof req.body?.priority === 'string') patch.priority = req.body.priority;
     if (typeof req.body?.title === 'string') patch.title = req.body.title;
     if (typeof req.body?.category === 'string' || req.body?.category === null) patch.category = req.body.category;

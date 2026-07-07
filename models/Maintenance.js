@@ -109,6 +109,10 @@ const MaintenanceTicket = sequelize.define('MaintenanceTicket', {
     type: DataTypes.INTEGER,
     allowNull: true,
   },
+  rejectionReason: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 }, {
   timestamps: true,
   tableName: 'MaintenanceTicket',

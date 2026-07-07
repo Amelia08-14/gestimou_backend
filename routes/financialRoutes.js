@@ -9,12 +9,14 @@ const {
   deleteTransaction,
   generateAnnualCharges,
   getMyChargesSummary,
-  getMyCharges
+  getMyCharges,
+  getClientChargeStatus
 } = require('../controllers/financialController');
 
 router.post('/generate-charges', protect, authorizeRoles('ADMIN', 'RECOUVREMENT'), generateAnnualCharges);
 router.get('/my-charges-summary', protect, authorizeRoles('RESIDENT'), getMyChargesSummary);
 router.get('/my-charges', protect, authorizeRoles('RESIDENT'), getMyCharges);
+router.get('/client-status', protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'RECOUVREMENT'), getClientChargeStatus);
 
 router.route('/')
   .get(protect, authorizeRoles('ADMIN', 'RECOUVREMENT', 'GESTIONNAIRE_TAG'), getTransactions)
