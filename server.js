@@ -116,6 +116,16 @@ const ensureMaintenanceTicketColumns = async () => {
       console.log(`MaintenanceTicket.${name} column added.`);
     }
   }
+
+  await sequelize.query(
+    'UPDATE `MaintenanceTicket` SET `title` = :nextTitle WHERE `title` IN (:oldTitles)',
+    {
+      replacements: {
+        nextTitle: 'Peinture Escalier',
+        oldTitles: ['Peinture écaillée', 'Peinture escaliers'],
+      },
+    }
+  );
 };
 
 // Mount routers

@@ -4,12 +4,20 @@ const { writeAuditLog } = require('../utils/auditLog');
 
 const isAllZones = (zone) => String(zone || '').trim().toUpperCase() === 'ALL';
 
+const normalizeTicketTitle = (title) => {
+  const value = String(title || '').trim();
+  if (value === 'Peinture écaillée' || value === 'Peinture escaliers') {
+    return 'Peinture Escalier';
+  }
+  return value;
+};
+
 const PROBLEM_TYPES = [
   {
     category: 'Peinture (Partie Commune)',
     items: [
       'Retouches peinture couloir',
-      'Peinture escaliers',
+      'Peinture Escalier',
       "Traces d'humidité",
       'Autre problème de peinture'
     ]
@@ -258,6 +266,7 @@ exports.createTicket = async (req, res) => {
 
     const ticketData = {
         ...req.body,
+        title: normalizeTicketTitle(req.body.title),
         description: safeDescription,
         email: req.user ? req.user.email : req.body.email,
         requester: req.user ? req.user.name : (req.body.requester || 'Anonyme')
@@ -386,7 +395,7 @@ exports.updateTicket = async (req, res) => {
     }
 
     if (typeof req.body?.priority === 'string') patch.priority = req.body.priority;
-    if (typeof req.body?.title === 'string') patch.title = req.body.title;
+    if (typeof req.body?.title === 'string') patch.title = normalizeTicketTitle(req.body.title);
     if (typeof req.body?.category === 'string' || req.body?.category === null) patch.category = req.body.category;
     if (typeof req.body?.location === 'string') patch.location = req.body.location;
 
