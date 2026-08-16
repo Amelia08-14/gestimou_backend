@@ -27,11 +27,11 @@ const Property = sequelize.define('Property', {
   },
   type: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
   surface: {
     type: DataTypes.FLOAT,
-    allowNull: false,
+    allowNull: true,
   },
   floor: {
     type: DataTypes.STRING,

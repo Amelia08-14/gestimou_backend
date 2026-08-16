@@ -1,7 +1,7 @@
 const zoneDefinitions = {
   'Zone 1': ['JAIS', 'LES CRÊTES', 'RUBIS', 'OPALE', 'EL BOUROUDJ', 'BERYL', 'PYRITE', 'RÉSIDENCE PRESTIGE', 'RESIDENCE PRESTIGE', 'PRESTIGE'],
   'Zone 2': ['COQUELICOT', 'PLUMERIA', 'CORAIL', 'PERIDOT', 'MORDJANE'],
-  'Zone 3': ['SELENITE', 'SPINELLE', 'TURQUOISE', 'ÉMERAUDE', 'PERLA', 'CITRINE', 'ANGETITE']
+  'Zone 3': ['SELENITE', 'SPINELLE', 'TURQUOISE', 'ÉMERAUDE', 'PERLA', 'CITRINE', 'ANGÉLITE']
 };
 
 const normalizeResidenceName = (value = '') =>
