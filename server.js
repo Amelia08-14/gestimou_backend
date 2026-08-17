@@ -86,6 +86,7 @@ const auditLogRoutes = require('./routes/auditLogRoutes');
 const subcontractorRoutes = require('./routes/subcontractorRoutes');
 const appelDeFondsRoutes = require('./routes/appelDeFondsRoutes');
 const tagRoutes = require('./routes/tagRoutes');
+const passwordResetPageRoutes = require('./routes/passwordResetPageRoutes');
 const { startAnnualChargesScheduler } = require('./jobs/annualChargesScheduler');
 
 const ensureMaintenanceTicketColumns = async () => {
@@ -147,6 +148,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/appel-de-fonds', appelDeFondsRoutes);
 app.use('/api/tags', tagRoutes);
+app.use('/', passwordResetPageRoutes);
 
 const PORT = process.env.PORT || 5000;
 
@@ -155,12 +157,13 @@ const PORT = process.env.PORT || 5000;
 
   // Ensure tables added after initial DB sync exist (safe: only creates, never drops)
   try {
-    const { PropertyAddRequest, UserDevice, AuditLog, Tag } = require('./models');
+    const { PropertyAddRequest, UserDevice, AuditLog, Tag, PasswordResetToken } = require('./models');
     await Promise.all([
       PropertyAddRequest.sync(),
       UserDevice.sync(),
       AuditLog.sync(),
       Tag.sync(),
+      PasswordResetToken.sync(),
     ]);
     await ensureMaintenanceTicketColumns();
     console.log('Model tables verified/created.');

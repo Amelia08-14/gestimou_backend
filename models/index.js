@@ -15,12 +15,17 @@ const AuditLog = require('./AuditLog');
 const AppelDeFonds = require('./AppelDeFonds');
 const AppelDeFondsDocument = require('./AppelDeFondsDocument');
 const Tag = require('./Tag');
+const PasswordResetToken = require('./PasswordResetToken');
 
 // Define Associations
 
 // User <-> UserDevice
 User.hasMany(UserDevice, { foreignKey: 'userId', as: 'devices' });
 UserDevice.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// User <-> PasswordResetToken
+User.hasMany(PasswordResetToken, { foreignKey: 'userId', as: 'passwordResetTokens' });
+PasswordResetToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 User.hasMany(PropertyAddRequest, { foreignKey: 'userId', as: 'propertyAddRequests' });
 PropertyAddRequest.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -104,4 +109,5 @@ module.exports = {
   AppelDeFonds,
   AppelDeFondsDocument,
   Tag,
+  PasswordResetToken,
 };
