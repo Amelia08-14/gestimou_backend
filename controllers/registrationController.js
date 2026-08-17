@@ -22,9 +22,11 @@ exports.getResidenceOptions = async (req, res) => {
     }
 
     // forPropertyRequest=true: only show properties with no existing owner (strict check)
-    // Registration (default): show all Libre properties so residents can claim their apartment
-    const whereClause = { residenceId, status: 'Libre' };
+    // Registration (default): show Occupé/Vendu properties — residents already living there
+    // register for their apartment. Libre units are handled separately after key handover.
+    const whereClause = { residenceId, status: { [Op.ne]: 'Libre' } };
     if (req.query.forPropertyRequest === 'true') {
+      whereClause.status = 'Libre';
       whereClause.ownerId = null;
     }
 
