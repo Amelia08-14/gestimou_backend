@@ -303,9 +303,11 @@ exports.approveRequest = async (req, res) => {
     let linkedProperty = null;
     if (request.residenceId && request.door) { // Block might be empty
         const doorNumber = request.door.trim();
+        // Residents register for the apartment they already occupy, so we
+        // match on location only — the property is expected to already be
+        // 'Occupé'/'Vendu', not 'Libre' (those are handled after key handover).
         const whereClause = {
             residenceId: request.residenceId,
-            status: 'Libre',
             [Op.or]: [
                 { lotNumber: doorNumber },
                 { lotNumber: { [Op.like]: `%-${doorNumber}` } }
