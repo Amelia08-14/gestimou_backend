@@ -16,6 +16,8 @@ const AppelDeFonds = require('./AppelDeFonds');
 const AppelDeFondsDocument = require('./AppelDeFondsDocument');
 const Tag = require('./Tag');
 const PasswordResetToken = require('./PasswordResetToken');
+const HouseholdMember = require('./HouseholdMember');
+const Message = require('./Message');
 
 // Define Associations
 
@@ -91,6 +93,17 @@ AppelDeFondsDocument.belongsTo(AppelDeFonds, { foreignKey: 'appelDeFondsId', as:
 AppelDeFondsDocument.belongsTo(Document, { foreignKey: 'documentId', as: 'document', constraints: false });
 Document.hasMany(AppelDeFondsDocument, { foreignKey: 'documentId', as: 'appelDeFondsLinks' });
 
+// HouseholdMember <-> User
+User.hasMany(HouseholdMember, { foreignKey: 'userId', as: 'householdMembers' });
+HouseholdMember.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// Message <-> User (thread owner + sender) / MaintenanceTicket
+User.hasMany(Message, { foreignKey: 'userId', as: 'messageThreads' });
+Message.belongsTo(User, { foreignKey: 'userId', as: 'threadOwner' });
+Message.belongsTo(User, { foreignKey: 'senderId', as: 'sender', constraints: false });
+MaintenanceTicket.hasMany(Message, { foreignKey: 'ticketId', as: 'messages', constraints: false });
+Message.belongsTo(MaintenanceTicket, { foreignKey: 'ticketId', as: 'ticket', constraints: false });
+
 module.exports = {
   User,
   Property,
@@ -110,4 +123,6 @@ module.exports = {
   AppelDeFondsDocument,
   Tag,
   PasswordResetToken,
+  HouseholdMember,
+  Message,
 };

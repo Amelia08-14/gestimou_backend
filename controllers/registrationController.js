@@ -301,12 +301,18 @@ exports.approveRequest = async (req, res) => {
     // 3. Link Property (Optional - if property exists, link it to owner)
     // We try to find property by details provided
     let linkedProperty = null;
+    let propertyLinkWarning = null;
     if (request.residenceId && request.door) { // Block might be empty
         const doorNumber = request.door.trim();
         // Residents register for the apartment they already occupy, so we
         // match on location only — the property is expected to already be
         // 'Occupé'/'Vendu', not 'Libre' (those are handled after key handover).
-        const whereClause = {
+        // Matching is done in two passes: first a strict pass (door + block +
+        // floor when provided), then — if nothing matched — a looser
+        // case/whitespace-insensitive pass on the same residence + door only,
+        // since block/floor formatting can drift between residences (e.g.
+        // ground floor stored as '' for some, 'RDC' for others).
+        const doorWhere = {
             residenceId: request.residenceId,
             [Op.or]: [
                 { lotNumber: doorNumber },
@@ -314,28 +320,47 @@ exports.approveRequest = async (req, res) => {
             ]
         };
 
+        const strictWhere = { ...doorWhere };
         if (request.block && request.block.trim() !== '') {
-            whereClause.block = request.block.trim();
+            strictWhere.block = request.block.trim();
         }
         if (request.floor && request.floor.trim() !== '') {
-            whereClause.floor = request.floor.trim();
+            strictWhere.floor = request.floor.trim();
         }
 
-        console.log('Searching for property with:', whereClause);
+        console.log('Searching for property with:', strictWhere);
 
-        const property = await Property.findOne({
-            where: whereClause
-        });
+        let property = await Property.findOne({ where: strictWhere });
+
+        if (!property) {
+            // Loose fallback: same residence + door, ignore block/floor casing/whitespace.
+            const candidates = await Property.findAll({ where: doorWhere });
+            const norm = (v) => String(v || '').trim().toLowerCase();
+            const wantBlock = norm(request.block);
+            const wantFloor = norm(request.floor);
+            property = candidates.find((p) => {
+                const blockOk = !wantBlock || norm(p.block) === wantBlock;
+                const floorOk = !wantFloor || norm(p.floor) === wantFloor;
+                return blockOk && floorOk;
+            }) || (candidates.length === 1 ? candidates[0] : null);
+
+            if (property) {
+                console.log(`Property found via loose match: ${property.title} (ID: ${property.id})`);
+            }
+        }
 
         if (property) {
-            console.log(`Property found: ${property.title} (ID: ${property.id})`);
-            // Assign owner to property
-            // We update ownerId to the new owner. 
+            if (property.ownerId && property.ownerId !== owner.id) {
+                console.warn(`Property ${property.id} already has ownerId=${property.ownerId}; reassigning to ${owner.id} for ${request.email}.`);
+            }
             await property.update({ ownerId: owner.id, status: 'Vendu' });
             linkedProperty = property;
         } else {
-            console.warn(`No property found for Residence: ${request.residenceId}, Block: ${request.block}, Door: ${request.door}`);
+            propertyLinkWarning = `Aucun bien correspondant trouvé (résidence: ${request.residenceId}, bloc: ${request.block || '-'}, étage: ${request.floor || '-'}, porte: ${request.door}). Le compte a été créé mais le bien doit être affecté manuellement.`;
+            console.warn(propertyLinkWarning);
         }
+    } else {
+        propertyLinkWarning = "Aucune résidence/porte fournie dans la demande — le bien doit être affecté manuellement.";
     }
 
     // Assign zone to user if property found (Resident inherits zone from property)
@@ -359,26 +384,33 @@ exports.approveRequest = async (req, res) => {
     });
 
     // 5. Send Email
-    const emailSubject = 'Bienvenue sur Gestimou - Vos accès';
+    const emailSubject = 'Bienvenue sur Global Immo Service - Vos accès';
     const emailBody = `
     Bonjour ${request.firstName},
 
     Votre demande d'inscription a été validée avec succès.
-    
-    Voici vos identifiants pour vous connecter à l'application mobile Gestimou :
-    
+
+    Voici vos identifiants pour vous connecter à l'application mobile Global Immo Service :
+
     Email : ${request.email}
     Mot de passe : ${tempPassword}
-    
+
     Nous vous recommandons de changer ce mot de passe lors de votre première connexion (si cette fonctionnalité est disponible) ou de le conserver précieusement.
-    
+
     Cordialement,
-    L'équipe Gestimou.
+    L'équipe Global Immo Service.
     `;
 
     await sendEmail(request.email, emailSubject, emailBody);
 
-    res.json({ message: 'Compte validé et créé avec succès. Email envoyé.', user, tempPassword });
+    res.json({
+      message: 'Compte validé et créé avec succès. Email envoyé.',
+      user,
+      tempPassword,
+      propertyLinked: Boolean(linkedProperty),
+      propertyLinkWarning,
+      linkedPropertyId: linkedProperty ? linkedProperty.id : null
+    });
 
   } catch (err) {
     console.error(err);
