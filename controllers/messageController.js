@@ -1,4 +1,4 @@
-const { Message, MaintenanceTicket, User, Notification } = require('../models');
+const { Message, MaintenanceTicket, User, Notification, Owner } = require('../models');
 const { saveImageDataUrl } = require('../utils/mediaUpload');
 
 const STAFF_ROLES = new Set(['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE', 'INTERVENANT']);
@@ -110,6 +110,73 @@ exports.sendTicketMessage = async (req, res) => {
     res.status(201).json(serialize(withSender));
   } catch (err) {
     console.error('[Message] sendTicketMessage error:', err?.message);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    List admin-chat threads (one per resident who has messaged), newest first
+// @route   GET /api/messages/admin/threads
+exports.getAdminThreads = async (req, res) => {
+  try {
+    if (!isStaff(req.user)) return res.status(403).json({ error: 'Forbidden' });
+
+    const messages = await Message.findAll({
+      where: { ticketId: null },
+      include: [{ model: User, as: 'threadOwner', attributes: ['id', 'name', 'email'] }],
+      order: [['createdAt', 'DESC']],
+    });
+
+    const threads = new Map();
+    for (const m of messages) {
+      const uid = m.userId;
+      if (threads.has(uid)) continue;
+      threads.set(uid, {
+        userId: uid,
+        userName: m.threadOwner?.name || null,
+        userEmail: m.threadOwner?.email || null,
+        lastMessage: m.body,
+        lastMessageAt: m.createdAt,
+        lastSenderRole: m.senderRole,
+        unread: !STAFF_ROLES.has(String(m.senderRole || '')) && !m.readAt,
+      });
+    }
+
+    const list = Array.from(threads.values());
+    const emails = list.map((t) => t.userEmail).filter(Boolean);
+    if (emails.length) {
+      const owners = await Owner.findAll({
+        where: { email: emails },
+        attributes: ['email', 'residenceId', 'block', 'floor', 'doorNumber'],
+      });
+      const byEmail = new Map(owners.map((o) => [String(o.email).toLowerCase(), o]));
+      for (const t of list) {
+        const owner = t.userEmail ? byEmail.get(String(t.userEmail).toLowerCase()) : null;
+        if (owner) {
+          t.unit = [owner.block, owner.floor, owner.doorNumber].filter(Boolean).join('-') || null;
+          t.residenceId = owner.residenceId || null;
+        }
+      }
+    }
+
+    res.json(list);
+  } catch (err) {
+    console.error('[Message] getAdminThreads error:', err?.message);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Mark a resident's admin thread as read (staff side)
+// @route   PUT /api/messages/admin/:userId/read
+exports.markAdminThreadRead = async (req, res) => {
+  try {
+    if (!isStaff(req.user)) return res.status(403).json({ error: 'Forbidden' });
+    await Message.update(
+      { readAt: new Date() },
+      { where: { ticketId: null, userId: Number(req.params.userId), readAt: null } }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Message] markAdminThreadRead error:', err?.message);
     res.status(500).json({ error: 'Server Error' });
   }
 };
