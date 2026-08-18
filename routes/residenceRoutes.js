@@ -7,7 +7,8 @@ const {
   createResidence,
   updateResidence,
   deleteResidence,
-  uploadResidenceMedia
+  uploadResidenceMedia,
+  getResidenceTrombinoscope
 } = require('../controllers/residenceController');
 
 router.route('/')
@@ -21,5 +22,12 @@ router.route('/:id')
 
 router.route('/:id/upload')
   .post(protect, admin, uploadResidenceMedia);
+
+router.get(
+  '/:id/trombinoscope',
+  protect,
+  authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER'),
+  getResidenceTrombinoscope
+);
 
 module.exports = router;

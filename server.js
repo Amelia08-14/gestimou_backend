@@ -89,6 +89,7 @@ const tagRoutes = require('./routes/tagRoutes');
 const passwordResetPageRoutes = require('./routes/passwordResetPageRoutes');
 const householdMemberRoutes = require('./routes/householdMemberRoutes');
 const messageRoutes = require('./routes/messageRoutes');
+const announcementRoutes = require('./routes/announcementRoutes');
 const { startAnnualChargesScheduler } = require('./jobs/annualChargesScheduler');
 
 const ensureMaintenanceTicketColumns = async () => {
@@ -152,6 +153,7 @@ app.use('/api/appel-de-fonds', appelDeFondsRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/household-members', householdMemberRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/announcements', announcementRoutes);
 app.use('/', passwordResetPageRoutes);
 
 const PORT = process.env.PORT || 5000;
@@ -161,7 +163,7 @@ const PORT = process.env.PORT || 5000;
 
   // Ensure tables added after initial DB sync exist (safe: only creates, never drops)
   try {
-    const { PropertyAddRequest, UserDevice, AuditLog, Tag, PasswordResetToken, HouseholdMember, Message } = require('./models');
+    const { PropertyAddRequest, UserDevice, AuditLog, Tag, PasswordResetToken, HouseholdMember, Message, Announcement, AnnouncementRead } = require('./models');
     await Promise.all([
       PropertyAddRequest.sync(),
       UserDevice.sync(),
@@ -170,7 +172,9 @@ const PORT = process.env.PORT || 5000;
       PasswordResetToken.sync(),
       HouseholdMember.sync(),
       Message.sync(),
+      Announcement.sync(),
     ]);
+    await AnnouncementRead.sync();
     await ensureMaintenanceTicketColumns();
     console.log('Model tables verified/created.');
   } catch (e) {

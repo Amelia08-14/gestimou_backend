@@ -1,4 +1,5 @@
-const { Residence, Property, Owner } = require('../models');
+const { Residence, Property, Owner, User, FinancialTransaction, HouseholdMember } = require('../models');
+const { Op } = require('sequelize');
 const fs = require('fs');
 const path = require('path');
 
@@ -167,6 +168,97 @@ exports.uploadResidenceMedia = async (req, res) => {
 
     res.json({ url: publicPath });
   } catch (err) {
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Per-residence property/owner directory ("Trombinoscope"), grouped by block
+// @route   GET /api/residences/:id/trombinoscope
+exports.getResidenceTrombinoscope = async (req, res) => {
+  try {
+    const residenceId = req.params.id;
+    const properties = await Property.findAll({
+      where: { residenceId },
+      include: [{ model: Owner, as: 'owner', required: false }],
+      order: [['block', 'ASC'], ['floor', 'ASC'], ['lotNumber', 'ASC']],
+    });
+
+    const ownerEmails = properties
+      .map((p) => p.owner?.email)
+      .filter(Boolean)
+      .map((e) => String(e).toLowerCase());
+
+    const [users, transactions] = await Promise.all([
+      ownerEmails.length
+        ? User.findAll({ where: { email: { [Op.in]: ownerEmails } }, attributes: ['id', 'email', 'mustChangePassword'] })
+        : [],
+      FinancialTransaction.findAll({
+        where: { propertyId: { [Op.in]: properties.map((p) => p.id) } },
+        attributes: ['propertyId', 'status'],
+      }),
+    ]);
+
+    const userByEmail = new Map(users.map((u) => [String(u.email).toLowerCase(), u]));
+
+    const householdCounts = new Map();
+    if (users.length) {
+      const counts = await HouseholdMember.findAll({
+        where: { userId: { [Op.in]: users.map((u) => u.id) } },
+        attributes: ['userId'],
+      });
+      const byUserId = new Map();
+      for (const c of counts) byUserId.set(c.userId, (byUserId.get(c.userId) || 0) + 1);
+      for (const u of users) householdCounts.set(String(u.email).toLowerCase(), byUserId.get(u.id) || 0);
+    }
+
+    const txByProperty = new Map();
+    for (const t of transactions) {
+      const list = txByProperty.get(t.propertyId) || [];
+      list.push(t.status);
+      txByProperty.set(t.propertyId, list);
+    }
+
+    const rows = properties.map((p) => {
+      const ownerEmail = p.owner?.email ? String(p.owner.email).toLowerCase() : null;
+      const user = ownerEmail ? userByEmail.get(ownerEmail) : null;
+      const statuses = txByProperty.get(p.id) || [];
+
+      let accountStatus = 'SANS_COMPTE';
+      if (user) accountStatus = user.mustChangePassword ? 'PREMIERE_CONNEXION' : 'ACTIF';
+
+      let paymentStatus = null;
+      if (statuses.includes('En attente')) paymentStatus = 'IMPAYE';
+      else if (statuses.includes('Payé')) paymentStatus = 'REGLE';
+
+      return {
+        propertyId: p.id,
+        block: p.block || '—',
+        floor: p.floor || '',
+        lotNumber: p.lotNumber || '',
+        surface: p.surface,
+        ownerName: p.owner ? `${p.owner.firstName} ${p.owner.lastName}`.trim() : null,
+        ownerId: p.owner?.id || null,
+        occupants: ownerEmail ? 1 + (householdCounts.get(ownerEmail) || 0) : 0,
+        accountStatus,
+        paymentStatus,
+      };
+    });
+
+    const blocks = new Map();
+    for (const r of rows) {
+      if (!blocks.has(r.block)) blocks.set(r.block, []);
+      blocks.get(r.block).push(r);
+    }
+
+    res.json({
+      totalLots: rows.length,
+      activeAccounts: rows.filter((r) => r.accountStatus === 'ACTIF').length,
+      pendingFirstLogin: rows.filter((r) => r.accountStatus === 'PREMIERE_CONNEXION').length,
+      noAccount: rows.filter((r) => r.accountStatus === 'SANS_COMPTE').length,
+      blocks: Array.from(blocks.entries()).map(([block, lots]) => ({ block, lots })),
+    });
+  } catch (err) {
+    console.error('[Residence] getResidenceTrombinoscope error:', err?.message);
     res.status(500).json({ error: 'Server Error' });
   }
 };

@@ -18,6 +18,8 @@ const Tag = require('./Tag');
 const PasswordResetToken = require('./PasswordResetToken');
 const HouseholdMember = require('./HouseholdMember');
 const Message = require('./Message');
+const Announcement = require('./Announcement');
+const AnnouncementRead = require('./AnnouncementRead');
 
 // Define Associations
 
@@ -104,6 +106,14 @@ Message.belongsTo(User, { foreignKey: 'senderId', as: 'sender', constraints: fal
 MaintenanceTicket.hasMany(Message, { foreignKey: 'ticketId', as: 'messages', constraints: false });
 Message.belongsTo(MaintenanceTicket, { foreignKey: 'ticketId', as: 'ticket', constraints: false });
 
+// Announcement <-> Residence / AnnouncementRead
+Residence.hasMany(Announcement, { foreignKey: 'residenceId', as: 'announcements', constraints: false });
+Announcement.belongsTo(Residence, { foreignKey: 'residenceId', as: 'residence', constraints: false });
+Announcement.hasMany(AnnouncementRead, { foreignKey: 'announcementId', as: 'reads' });
+AnnouncementRead.belongsTo(Announcement, { foreignKey: 'announcementId', as: 'announcement' });
+User.hasMany(AnnouncementRead, { foreignKey: 'userId', as: 'announcementReads' });
+AnnouncementRead.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 module.exports = {
   User,
   Property,
@@ -125,4 +135,6 @@ module.exports = {
   PasswordResetToken,
   HouseholdMember,
   Message,
+  Announcement,
+  AnnouncementRead,
 };
