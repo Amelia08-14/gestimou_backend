@@ -30,7 +30,10 @@ exports.submitPropertyAddRequest = async (req, res) => {
       console.log(`[PropertyAddRequest] residenceId mismatch: property.residenceId="${property.residenceId}" submitted="${residenceId}"`);
       return res.status(400).json({ error: "Bien invalide pour cette résidence." });
     }
-    if (String(property.status || '').trim() !== 'Libre') {
+    // Available to claim means nobody is linked as its owner yet — residents
+    // add properties they already occupy, so status is 'Occupé'/'Vendu', not
+    // 'Libre' (those are handled separately after key handover).
+    if (property.ownerId) {
       console.log(`[PropertyAddRequest] not available: status="${property.status}" ownerId="${property.ownerId}"`);
       return res.status(400).json({ error: "Ce bien n'est plus disponible." });
     }
@@ -143,7 +146,7 @@ exports.approvePropertyAddRequest = async (req, res) => {
     if (String(property.residenceId || '').trim() !== residenceId) {
       return res.status(400).json({ error: "Bien invalide pour cette résidence." });
     }
-    if (String(property.status || '').trim() !== 'Libre' || property.ownerId) {
+    if (property.ownerId) {
       return res.status(400).json({ error: "Ce bien n'est plus disponible." });
     }
 

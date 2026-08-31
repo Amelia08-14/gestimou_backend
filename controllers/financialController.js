@@ -44,7 +44,7 @@ const generateAnnualChargesInternal = async ({ year, amount, force = false, now 
 
     if (existing) continue;
 
-    const monthlyAmount = Number(amount || property.price || 15000);
+    const monthlyAmount = Number(amount || property.price || 10000);
     const chargeAmount = monthlyAmount;
     const residence = residenceById.get(property.residenceId);
     const residenceName = residence?.name || property.residenceId || '';
@@ -135,7 +135,7 @@ exports.getMyChargesSummary = async (req, res) => {
 
     const due = nextUnpaid || latestPaidEnd;
     if (!due) {
-      return res.json({ status: 'Actif', ownerStatus: 'Actif', nextPaymentDate: null, annualAmount: 15000 * 12, daysRemaining: null });
+      return res.json({ status: 'Actif', ownerStatus: 'Actif', nextPaymentDate: null, annualAmount: 10000 * 12, daysRemaining: null });
     }
 
     const msLeft = due.getTime() - now.getTime();
@@ -170,7 +170,7 @@ exports.getMyChargesSummary = async (req, res) => {
       status: ownerStatus,
       ownerStatus,
       nextPaymentDate: due.toISOString(),
-      annualAmount: 15000 * 12,
+      annualAmount: 10000 * 12,
       daysRemaining
     });
   } catch (err) {

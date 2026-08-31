@@ -21,12 +21,13 @@ exports.getResidenceOptions = async (req, res) => {
       return res.status(400).json({ success: false, error: 'residenceId requis.' });
     }
 
-    // forPropertyRequest=true: only show properties with no existing owner (strict check)
-    // Registration (default): show Occupé/Vendu properties — residents already living there
-    // register for their apartment. Libre units are handled separately after key handover.
+    // Residents register for / claim the apartment they already occupy, so we
+    // never filter on 'Libre' status — those units are handled separately
+    // after key handover. What actually distinguishes "available to claim"
+    // (forPropertyRequest=true, an existing resident adding another property
+    // they own) is simply that nobody has been linked as its owner yet.
     const whereClause = { residenceId, status: { [Op.ne]: 'Libre' } };
     if (req.query.forPropertyRequest === 'true') {
-      whereClause.status = 'Libre';
       whereClause.ownerId = null;
     }
 
