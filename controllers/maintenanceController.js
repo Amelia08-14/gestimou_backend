@@ -405,14 +405,22 @@ exports.updateTicket = async (req, res) => {
     }
 
     if (typeof req.body?.responsible === 'string' || req.body?.responsible === null) {
-      if (!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+      // canAccessTicket() above already restricted RESPONSABLE_ZONE to tickets
+      // in their own zone (or all zones, if they manage 'ALL') — they're the
+      // one who assigns tickets, so they must be able to set/change who's
+      // responsible for it, not just ADMIN.
+      if (!isAdmin && !isZoneManager) return res.status(403).json({ error: 'Forbidden' });
       patch.responsible = req.body.responsible || null;
     }
 
     const wantsAssignIntervenant = 'subcontractorId' in (req.body || {}) || 'assignee' in (req.body || {});
     if (wantsAssignIntervenant) {
       const residence = ticket.residenceId ? await Residence.findByPk(ticket.residenceId) : null;
-      const isInZone = isZoneManager && user?.zone && residence?.zone && user.zone === residence.zone;
+      const zoneManagerZone = String(user?.zone || '').trim();
+      const isInZone =
+        isZoneManager &&
+        (isAllZones(zoneManagerZone) ||
+          (zoneManagerZone && residence?.zone && zoneManagerZone === residence.zone));
 
       const canSelfTake = !ticket.responsible && (isInZone || isSecurityManager);
       const canAssign =
