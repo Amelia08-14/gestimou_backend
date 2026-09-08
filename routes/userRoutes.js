@@ -12,7 +12,11 @@ const {
 } = require('../controllers/userController');
 
 router.route('/')
-  .get(protect, authorizeRoles('ADMIN'), getUsers)
+  // Listing is also needed by RESPONSABLE_ZONE/MANAGER to pick a
+  // responsible/intervenant when assigning tickets (mobile + admin-web
+  // maintenance screens) — password is already excluded from the response.
+  // Creating staff accounts stays ADMIN-only.
+  .get(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER'), getUsers)
   .post(protect, authorizeRoles('ADMIN'), createUser);
 
 router.route('/:id')
