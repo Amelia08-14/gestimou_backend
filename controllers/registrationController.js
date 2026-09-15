@@ -385,13 +385,13 @@ exports.approveRequest = async (req, res) => {
     });
 
     // 5. Send Email
-    const emailSubject = 'Bienvenue sur Global Immo Service - Vos accès';
+    const emailSubject = 'Bienvenue sur Gérance Immo Service - Vos accès';
     const emailBody = `
     Bonjour ${request.firstName},
 
     Votre demande d'inscription a été validée avec succès.
 
-    Voici vos identifiants pour vous connecter à l'application mobile Global Immo Service :
+    Voici vos identifiants pour vous connecter à l'application mobile Gérance Immo Service :
 
     Email : ${request.email}
     Mot de passe : ${tempPassword}
@@ -399,7 +399,7 @@ exports.approveRequest = async (req, res) => {
     Nous vous recommandons de changer ce mot de passe lors de votre première connexion (si cette fonctionnalité est disponible) ou de le conserver précieusement.
 
     Cordialement,
-    L'équipe Global Immo Service.
+    L'équipe Gérance Immo Service.
     `;
 
     await sendEmail(request.email, emailSubject, emailBody);
