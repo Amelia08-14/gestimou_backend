@@ -14,4 +14,12 @@ const getEffectiveResidentEmail = async (user) => {
   return String(resident?.email || '').trim().toLowerCase();
 };
 
-module.exports = { getEffectiveResidentUser, getEffectiveResidentEmail };
+// Ids of the primary resident and of every account created through their household.
+const getHouseholdUserIds = async (user) => {
+  const primary = await getEffectiveResidentUser(user);
+  if (!primary) return [];
+  const members = await User.findAll({ where: { householdOwnerId: primary.id }, attributes: ['id'] });
+  return [primary.id, ...members.map((m) => m.id)];
+};
+
+module.exports = { getEffectiveResidentUser, getEffectiveResidentEmail, getHouseholdUserIds };

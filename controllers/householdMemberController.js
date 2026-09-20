@@ -7,7 +7,6 @@ const { saveImageDataUrl } = require('../utils/mediaUpload');
 const { sendEmail } = require('../utils/mailer');
 const { writeAuditLog } = require('../utils/auditLog');
 
-const ACCESS_LEVELS = new Set(['FULL', 'RESIDENT', 'VISITOR', 'CUSTOM']);
 const MAX_HOUSEHOLD_MEMBERS = 4;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -17,7 +16,6 @@ const serialize = (member, linkedUser) => ({
   id: member.id,
   fullName: member.fullName,
   relation: member.relation,
-  accessLevel: member.accessLevel,
   phone: member.phone,
   photo: member.photo,
   email: member.email,
@@ -99,14 +97,12 @@ exports.addHouseholdMember = async (req, res) => {
   try {
     const fullName = String(req.body?.fullName || '').trim();
     const relation = String(req.body?.relation || '').trim();
-    let accessLevel = String(req.body?.accessLevel || 'RESIDENT').trim().toUpperCase();
     const phone = String(req.body?.phone || '').trim();
     const email = String(req.body?.email || '').trim().toLowerCase();
     const photoDataUrl = req.body?.photo;
 
     if (!fullName) return res.status(400).json({ error: 'Le nom est requis.' });
     if (!email) return res.status(400).json({ error: "L'adresse e-mail est requise." });
-    if (!ACCESS_LEVELS.has(accessLevel)) accessLevel = 'RESIDENT';
 
     const count = await HouseholdMember.count({ where: { userId: req.user.id } });
     if (count >= MAX_HOUSEHOLD_MEMBERS) {
@@ -131,7 +127,6 @@ exports.addHouseholdMember = async (req, res) => {
         userId: req.user.id,
         fullName,
         relation: relation || null,
-        accessLevel,
         phone: phone || null,
         photo,
       }, { transaction: tx });
@@ -181,10 +176,6 @@ exports.updateHouseholdMember = async (req, res) => {
     }
     if (req.body?.relation !== undefined) updates.relation = String(req.body.relation).trim() || null;
     if (req.body?.phone !== undefined) updates.phone = String(req.body.phone).trim() || null;
-    if (req.body?.accessLevel !== undefined) {
-      const accessLevel = String(req.body.accessLevel).trim().toUpperCase();
-      if (ACCESS_LEVELS.has(accessLevel)) updates.accessLevel = accessLevel;
-    }
     if (req.body?.photo) {
       const photo = await saveImageDataUrl(req.body.photo, 'household');
       if (!photo) return res.status(400).json({ error: 'Photo invalide.' });

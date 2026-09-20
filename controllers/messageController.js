@@ -1,7 +1,8 @@
+const { Op } = require('sequelize');
 const { Message, MaintenanceTicket, User, Notification } = require('../models');
 const { recordTicketHistory } = require('../utils/ticketHistory');
 const { saveImageDataUrl } = require('../utils/mediaUpload');
-const { getEffectiveResidentEmail, getEffectiveResidentUser } = require('../utils/residentScope');
+const { getEffectiveResidentEmail, getEffectiveResidentUser, getHouseholdUserIds } = require('../utils/residentScope');
 
 const STAFF_ROLES = new Set(['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE', 'INTERVENANT']);
 const isStaff = (user) => STAFF_ROLES.has(String(user?.role || ''));
@@ -31,6 +32,20 @@ const saveAttachments = async (list) => {
     if (url) saved.push({ url, type: 'image' });
   }
   return saved;
+};
+
+// Notifies everybody living in the resident's unit (primary resident + household accounts).
+const notifyHousehold = async (residentUser, { title, message }) => {
+  const ids = await getHouseholdUserIds(residentUser);
+  const text = String(message).slice(0, 250);
+  for (const userId of ids) {
+    await Notification.create({ userId, title, message: text, type: 'INFO' }).catch(() => null);
+  }
+};
+
+const preview = (text, max = 120) => {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 };
 
 // ── Report Chat (attached to a maintenance ticket) ────────────────────────
@@ -70,6 +85,20 @@ exports.sendTicketMessage = async (req, res) => {
       String(ticket.email || '').toLowerCase() === await getEffectiveResidentEmail(req.user);
     if (!ownsTicket && !isStaff(req.user)) return res.status(403).json({ error: 'Forbidden' });
 
+    // A resident can only reply: the conversation opens once someone from the
+    // administration/staff has written on this ticket (chat message or information).
+    if (ownsTicket) {
+      const staffMessages = await Message.count({
+        where: { ticketId: ticket.id, senderRole: { [Op.ne]: 'RESIDENT' } },
+      });
+      if (!staffMessages) {
+        return res.status(403).json({
+          error: "Vous pourrez écrire dès que l'administration vous aura envoyé un message.",
+          code: 'CHAT_LOCKED',
+        });
+      }
+    }
+
     const body = String(req.body?.body || '').trim();
     const attachments = await saveAttachments(req.body?.attachments);
     if (!body && !attachments.length) return res.status(400).json({ error: 'Message vide.' });
@@ -104,12 +133,10 @@ exports.sendTicketMessage = async (req, res) => {
         }).catch(() => null);
       }
     } else if (threadOwner) {
-      await Notification.create({
-        userId: threadOwner.id,
+      await notifyHousehold(threadOwner, {
         title: 'Nouvelle réponse',
-        message: `Une réponse a été ajoutée à votre signalement "${ticket.title}".`,
-        type: 'INFO',
-      }).catch(() => null);
+        message: `Nouveau message sur votre signalement "${ticket.title}"${body ? ` : ${preview(body)}` : '.'}`,
+      });
     }
 
     const withSender = await Message.findByPk(message.id, {
@@ -155,12 +182,10 @@ exports.sendTicketInfo = async (req, res) => {
 
     await recordTicketHistory({ ticketId: ticket.id, action: 'INFO_MESSAGE', note: body, actor: req.user });
 
-    await Notification.create({
-      userId: resident.id,
+    await notifyHousehold(resident, {
       title: 'Information sur votre signalement',
-      message: `L'administration a ajouté une information sur "${ticket.title}".`,
-      type: 'INFO',
-    }).catch(() => null);
+      message: `Information sur "${ticket.title}" : ${preview(body)}`,
+    });
 
     const withSender = await Message.findByPk(message.id, {
       include: [{ model: User, as: 'sender', attributes: ['id', 'name', 'role'] }],
