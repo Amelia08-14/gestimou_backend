@@ -8,20 +8,41 @@
 // Residences are matched to the website projects by accent/case-insensitive
 // name. Amenities are stored as catalogue keys (see data/residenceDetails.json);
 // the apps translate them (FR/EN/AR).
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 const { Residence } = require('../models');
 const { normalizeResidenceName } = require('../utils/residenceZones');
 const details = require('../data/residenceDetails.json');
+
+// Names used in the database that differ from the website's project titles.
+const ALIASES = { MORDJANE: 'EL MORDJANE' };
+
+const findSiteEntry = (name) => {
+  const key = normalizeResidenceName(name);
+  const withoutPrefix = key.replace(/^RESIDENCE\s+/, '');
+  return details.residences[key] || details.residences[withoutPrefix] || details.residences[ALIASES[withoutPrefix]] || null;
+};
+
+// Safe to run before the server has been restarted on this database.
+const ensureAmenitiesColumn = async () => {
+  const table = await sequelize.getQueryInterface().describeTable('Residence');
+  if (!table.amenities) {
+    await sequelize.getQueryInterface().addColumn('Residence', 'amenities', { type: DataTypes.TEXT, allowNull: true });
+    console.log('Residence.amenities column added.');
+  }
+};
 
 const force = process.argv.includes('--force');
 const dryRun = process.argv.includes('--dry-run');
 
 (async () => {
+  await ensureAmenitiesColumn();
   const residences = await Residence.findAll();
   let updated = 0;
   const unmatched = [];
 
   for (const residence of residences) {
-    const site = details.residences[normalizeResidenceName(residence.name)];
+    const site = findSiteEntry(residence.name);
     if (!site) {
       unmatched.push(residence.name);
       continue;
