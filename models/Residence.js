@@ -113,6 +113,31 @@ const Residence = sequelize.define('Residence', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
+  // JSON-encoded array of amenity labels shown to residents ("commodités").
+  amenities: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    get() {
+      const raw = this.getDataValue('amenities');
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return String(raw).split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    },
+    set(value) {
+      if (Array.isArray(value)) {
+        const cleaned = value.map((v) => String(v).trim()).filter(Boolean);
+        this.setDataValue('amenities', cleaned.length ? JSON.stringify(cleaned) : null);
+      } else if (value == null || value === '') {
+        this.setDataValue('amenities', null);
+      } else {
+        this.setDataValue('amenities', String(value));
+      }
+    },
+  },
 }, {
   timestamps: false, // Prisma schema doesn't have timestamps for Residence
   tableName: 'Residence',

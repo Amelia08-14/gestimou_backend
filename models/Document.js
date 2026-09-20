@@ -37,6 +37,13 @@ const Document = sequelize.define('Document', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  // Generic administration documents published to the resident mobile app
+  // (règlement, guides...). residenceId null = all residences.
+  visibleToResidents: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
 }, {
   timestamps: true,
   updatedAt: false, // Prisma schema only has createdAt

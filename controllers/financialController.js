@@ -1,5 +1,6 @@
 const { FinancialTransaction, Property, Residence, Owner, User, Notification, Document } = require('../models');
 const { Op } = require('sequelize');
+const { getEffectiveResidentEmail } = require('../utils/residentScope');
 
 const computeAnnualPeriod = (year) => {
   const periodStart = new Date(year, 0, 1);
@@ -93,10 +94,11 @@ exports.getMyChargesSummary = async (req, res) => {
     const user = req.user;
     if (!user) return res.status(401).json({ error: 'Not authorized' });
     if (user.role !== 'RESIDENT') return res.status(403).json({ error: 'Forbidden' });
+    const residentEmail = await getEffectiveResidentEmail(user);
 
     const props = await Property.findAll({
       attributes: ['id', 'price'],
-      include: [{ model: Owner, as: 'owner', required: true, where: { email: String(user.email).toLowerCase() }, attributes: ['id', 'email', 'status'] }]
+      include: [{ model: Owner, as: 'owner', required: true, where: { email: residentEmail }, attributes: ['id', 'email', 'status'] }]
     });
     const propertyIds = props.map((p) => p.id);
     const owner = props.length > 0 ? props[0].owner : null;
@@ -356,12 +358,13 @@ exports.getMyCharges = async (req, res) => {
     const user = req.user;
     if (!user) return res.status(401).json({ error: 'Not authorized' });
     if (user.role !== 'RESIDENT') return res.status(403).json({ error: 'Forbidden' });
+    const residentEmail = await getEffectiveResidentEmail(user);
 
     const props = await Property.findAll({
       attributes: ['id', 'title', 'lotNumber', 'block', 'floor'],
       include: [{
         model: Owner, as: 'owner', required: true,
-        where: { email: String(user.email).toLowerCase() },
+        where: { email: residentEmail },
         attributes: ['id', 'email']
       }]
     });

@@ -34,6 +34,13 @@ const Message = sequelize.define('Message', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  // CHAT = normal Report Chat message; INFO = one-way information posted by
+  // the administration on a ticket (e.g. a manager has to intervene).
+  kind: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'CHAT',
+  },
 }, {
   timestamps: true,
   tableName: 'Message',

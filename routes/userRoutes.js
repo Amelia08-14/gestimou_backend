@@ -8,7 +8,8 @@ const {
   updateUser,
   deleteUser,
   resetUserPassword,
-  resetUserDevices
+  resetUserDevices,
+  setUserStatus
 } = require('../controllers/userController');
 
 router.route('/')
@@ -26,6 +27,9 @@ router.route('/:id')
 
 router.route('/:id/reset-password')
   .post(protect, authorizeRoles('ADMIN'), resetUserPassword);
+
+router.route('/:id/status')
+  .put(protect, authorizeRoles('ADMIN'), setUserStatus);
 
 router.route('/:id/reset-devices')
   .delete(protect, authorizeRoles('ADMIN'), resetUserDevices);

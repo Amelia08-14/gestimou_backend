@@ -25,6 +25,15 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ error: 'Not authorized, user not found' });
     }
 
+    // Admin kill-switch: a deactivated (e.g. suspicious) account is cut off on
+    // its very next request, even with a still-valid token.
+    if (req.user.isActive === false) {
+      return res.status(403).json({
+        error: "Ce compte a été désactivé. Veuillez contacter l'administration.",
+        code: 'ACCOUNT_DISABLED',
+      });
+    }
+
     return next();
   } catch (error) {
     console.error(error);
@@ -39,7 +48,7 @@ const optionalProtect = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
     const user = await User.findByPk(decoded.id);
-    if (user) req.user = user;
+    if (user && user.isActive !== false) req.user = user;
   } catch (_) {
     // Ignore invalid tokens for public endpoints
   }
@@ -62,4 +71,14 @@ const authorizeRoles = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { protect, optionalProtect, admin, authorizeRoles };
+// Household members (accounts created by a resident) can use the app but
+// cannot manage the household or request new properties: only the primary
+// resident can.
+const requirePrimaryResident = (req, res, next) => {
+  if (req.user?.householdOwnerId) {
+    return res.status(403).json({ error: 'Action réservée au résident principal.' });
+  }
+  next();
+};
+
+module.exports = { protect, optionalProtect, admin, authorizeRoles, requirePrimaryResident };

@@ -1,5 +1,7 @@
 const { Message, MaintenanceTicket, User, Notification } = require('../models');
+const { recordTicketHistory } = require('../utils/ticketHistory');
 const { saveImageDataUrl } = require('../utils/mediaUpload');
+const { getEffectiveResidentEmail, getEffectiveResidentUser } = require('../utils/residentScope');
 
 const STAFF_ROLES = new Set(['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE', 'INTERVENANT']);
 const isStaff = (user) => STAFF_ROLES.has(String(user?.role || ''));
@@ -11,6 +13,7 @@ const serialize = (m) => ({
   senderId: m.senderId,
   senderRole: m.senderRole,
   senderName: m.sender?.name || null,
+  kind: m.kind || 'CHAT',
   body: m.body,
   attachments: (() => {
     try { return m.attachments ? JSON.parse(m.attachments) : []; } catch (_) { return []; }
@@ -39,7 +42,8 @@ exports.getTicketMessages = async (req, res) => {
     const ticket = await MaintenanceTicket.findByPk(req.params.ticketId);
     if (!ticket) return res.status(404).json({ error: 'Ticket introuvable.' });
 
-    const ownsTicket = String(ticket.email || '').toLowerCase() === String(req.user.email || '').toLowerCase();
+    const ownsTicket = req.user.role === 'RESIDENT' &&
+      String(ticket.email || '').toLowerCase() === await getEffectiveResidentEmail(req.user);
     if (!ownsTicket && !isStaff(req.user)) return res.status(403).json({ error: 'Forbidden' });
 
     const messages = await Message.findAll({
@@ -62,15 +66,18 @@ exports.sendTicketMessage = async (req, res) => {
     const ticket = await MaintenanceTicket.findByPk(req.params.ticketId);
     if (!ticket) return res.status(404).json({ error: 'Ticket introuvable.' });
 
-    const ownsTicket = String(ticket.email || '').toLowerCase() === String(req.user.email || '').toLowerCase();
+    const ownsTicket = req.user.role === 'RESIDENT' &&
+      String(ticket.email || '').toLowerCase() === await getEffectiveResidentEmail(req.user);
     if (!ownsTicket && !isStaff(req.user)) return res.status(403).json({ error: 'Forbidden' });
 
     const body = String(req.body?.body || '').trim();
     const attachments = await saveAttachments(req.body?.attachments);
     if (!body && !attachments.length) return res.status(400).json({ error: 'Message vide.' });
 
+    // Threads always belong to the primary resident, even when a household
+    // member writes, so chat history survives the member's account removal.
     const threadOwner = ownsTicket
-      ? req.user
+      ? await getEffectiveResidentUser(req.user)
       : (ticket.email ? await User.findOne({ where: { email: ticket.email } }) : null);
     if (!threadOwner) return res.status(400).json({ error: 'Résident introuvable pour ce ticket.' });
 
@@ -79,6 +86,7 @@ exports.sendTicketMessage = async (req, res) => {
       userId: threadOwner.id,
       senderId: req.user.id,
       senderRole: req.user.role,
+      kind: 'CHAT',
       body: body || null,
       attachments: attachments.length ? JSON.stringify(attachments) : null,
     });
@@ -114,3 +122,52 @@ exports.sendTicketMessage = async (req, res) => {
   }
 };
 
+
+// ── Information messages (administration -> resident, per ticket) ─────────
+
+const INFO_ROLES = new Set(['ADMIN', 'MANAGER', 'RESPONSABLE_ZONE']);
+
+// @desc    Post an information message on a ticket (e.g. a manager has to intervene)
+// @route   POST /api/messages/ticket/:ticketId/info
+// @access  ADMIN, MANAGER, RESPONSABLE_ZONE
+exports.sendTicketInfo = async (req, res) => {
+  try {
+    if (!INFO_ROLES.has(String(req.user?.role || ''))) return res.status(403).json({ error: 'Forbidden' });
+
+    const ticket = await MaintenanceTicket.findByPk(req.params.ticketId);
+    if (!ticket) return res.status(404).json({ error: 'Ticket introuvable.' });
+
+    const body = String(req.body?.body || '').trim();
+    if (!body) return res.status(400).json({ error: 'Message vide.' });
+    if (body.length > 1000) return res.status(400).json({ error: 'Message trop long (1000 caractères maximum).' });
+
+    const resident = ticket.email ? await User.findOne({ where: { email: String(ticket.email).toLowerCase() } }) : null;
+    if (!resident) return res.status(400).json({ error: 'Résident introuvable pour ce ticket.' });
+
+    const message = await Message.create({
+      ticketId: ticket.id,
+      userId: resident.id,
+      senderId: req.user.id,
+      senderRole: req.user.role,
+      kind: 'INFO',
+      body,
+    });
+
+    await recordTicketHistory({ ticketId: ticket.id, action: 'INFO_MESSAGE', note: body, actor: req.user });
+
+    await Notification.create({
+      userId: resident.id,
+      title: 'Information sur votre signalement',
+      message: `L'administration a ajouté une information sur "${ticket.title}".`,
+      type: 'INFO',
+    }).catch(() => null);
+
+    const withSender = await Message.findByPk(message.id, {
+      include: [{ model: User, as: 'sender', attributes: ['id', 'name', 'role'] }],
+    });
+    res.status(201).json(serialize(withSender));
+  } catch (err) {
+    console.error('[Message] sendTicketInfo error:', err?.message);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};

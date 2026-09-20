@@ -1,5 +1,6 @@
 const { Residence, Property, Owner, User, FinancialTransaction, HouseholdMember } = require('../models');
 const { Op } = require('sequelize');
+const { getEffectiveResidentEmail } = require('../utils/residentScope');
 const fs = require('fs');
 const path = require('path');
 
@@ -35,7 +36,7 @@ exports.getResidences = async (req, res) => {
         if (req.user.role === 'RESIDENT') {
             // scope=property_request: show all residences so the resident can request a property in any residence
             if (String(req.query.scope || '') !== 'property_request') {
-                const owner = await Owner.findOne({ where: { email: req.user.email } });
+                const owner = await Owner.findOne({ where: { email: await getEffectiveResidentEmail(req.user) } });
                 if (!owner || !owner.residenceId) return res.json([]);
                 where.id = owner.residenceId;
             }
@@ -72,14 +73,15 @@ exports.getResidence = async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
     if (req.user?.role === 'RESIDENT') {
-      const owner = await Owner.findOne({ where: { email: req.user.email } });
+      const owner = await Owner.findOne({ where: { email: await getEffectiveResidentEmail(req.user) } });
       if (!owner || !owner.residenceId || String(owner.residenceId) !== String(req.params.id)) {
         return res.status(403).json({ error: 'Forbidden' });
       }
     }
 
+    // Residents get the residence card only, never the other owners' properties.
     const residence = await Residence.findByPk(req.params.id, {
-      include: [{ model: Property }]
+      include: req.user?.role === 'RESIDENT' ? [] : [{ model: Property }]
     });
     if (!residence) return res.status(404).json({ error: 'Residence not found' });
     res.json(residence);

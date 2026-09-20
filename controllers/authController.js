@@ -2,6 +2,21 @@ const { User, UserDevice } = require('../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { writeAuditLog } = require('../utils/auditLog');
+const { saveImageDataUrl, removeUploadedImage } = require('../utils/mediaUpload');
+
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+
+const publicUser = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  profession: user.profession,
+  zone: user.zone,
+  photo: user.photo || null,
+  isHouseholdMember: !!user.householdOwnerId,
+  mustChangePassword: !!user.mustChangePassword,
+});
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
@@ -24,6 +39,13 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ error: 'Identifiants invalides' });
+    }
+
+    if (user.isActive === false) {
+      return res.status(403).json({
+        error: "Ce compte a été désactivé. Veuillez contacter l'administration.",
+        code: 'ACCOUNT_DISABLED',
+      });
     }
 
     // --- Device Management (For Residents) ---
@@ -75,16 +97,7 @@ exports.login = async (req, res) => {
       meta: { role: user.role }
     });
     
-    res.json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      profession: user.profession,
-      zone: user.zone,
-      mustChangePassword: !!user.mustChangePassword,
-      token
-    });
+    res.json({ ...publicUser(user), token });
     
   } catch (err) {
     console.error(err);
@@ -95,16 +108,44 @@ exports.login = async (req, res) => {
 // @desc    Get current user (me)
 // @route   GET /api/auth/me
 exports.me = async (req, res) => {
-  const user = req.user;
-  res.json({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    profession: user.profession,
-    zone: user.zone,
-    mustChangePassword: !!user.mustChangePassword,
-  });
+  res.json(publicUser(req.user));
+};
+
+// @desc    Set or replace the profile picture (optional, base64 data URL)
+// @route   PUT /api/auth/photo
+exports.updatePhoto = async (req, res) => {
+  try {
+    const photo = await saveImageDataUrl(req.body?.photo, 'avatars', { maxBytes: AVATAR_MAX_BYTES });
+    if (!photo) {
+      return res.status(400).json({ error: 'Photo invalide (JPG, PNG ou WebP, 5 Mo maximum).' });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    const previous = user.photo;
+    await user.update({ photo });
+    if (previous) removeUploadedImage(previous, 'avatars');
+
+    res.json(publicUser(user));
+  } catch (err) {
+    console.error('[updatePhoto]', err?.message);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Remove the profile picture
+// @route   DELETE /api/auth/photo
+exports.removePhoto = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    const previous = user.photo;
+    await user.update({ photo: null });
+    if (previous) removeUploadedImage(previous, 'avatars');
+
+    res.json(publicUser(user));
+  } catch (err) {
+    console.error('[removePhoto]', err?.message);
+    res.status(500).json({ error: 'Server Error' });
+  }
 };
 
 // @desc    Logout - remove current device from UserDevice table

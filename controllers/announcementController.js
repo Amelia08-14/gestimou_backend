@@ -1,4 +1,5 @@
 const { Op } = require('sequelize');
+const { getEffectiveResidentEmail } = require('../utils/residentScope');
 const { Announcement, AnnouncementRead, Owner, User, Residence } = require('../models');
 
 const STAFF_ROLES = new Set(['ADMIN', 'RESPONSABLE_ZONE', 'MANAGER']);
@@ -9,6 +10,39 @@ const parseBlocks = (blocks) =>
     .split(',')
     .map((b) => b.trim())
     .filter(Boolean);
+
+// Optional alert window (startsAt -> endsAt), e.g. "coupure d'eau de 09:00 à 12:00".
+// Returns { error } for an invalid window, or the values to store (undefined = not sent).
+const parseAlertWindow = (body, current = {}) => {
+  const out = {};
+  const read = (key) => {
+    if (body?.[key] === undefined) return;
+    if (!body[key]) { out[key] = null; return; }
+    const d = new Date(body[key]);
+    out[key] = Number.isNaN(d.getTime()) ? undefined : d;
+    if (Number.isNaN(d.getTime())) out.error = 'Date invalide.';
+  };
+  read('startsAt');
+  read('endsAt');
+  const startsAt = 'startsAt' in out ? out.startsAt : current.startsAt;
+  const endsAt = 'endsAt' in out ? out.endsAt : current.endsAt;
+  if (endsAt && !startsAt) out.error = "Renseignez l'heure de début avant l'heure de fin.";
+  else if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) {
+    out.error = "L'heure de fin doit être postérieure à l'heure de début.";
+  }
+  return out;
+};
+
+// UPCOMING -> ONGOING -> ENDED, computed on the server clock. null when the
+// announcement has no alert window.
+const alertPhase = (announcement, now = new Date()) => {
+  if (!announcement.startsAt) return null;
+  const start = new Date(announcement.startsAt);
+  const end = announcement.endsAt ? new Date(announcement.endsAt) : null;
+  if (now < start) return 'UPCOMING';
+  if (end && now >= end) return 'ENDED';
+  return 'ONGOING';
+};
 
 // Auto-promote SCHEDULED -> PUBLISHED once due, and PUBLISHED -> EXPIRED
 // once past expiresAt. Cheap lazy evaluation, no cron required.
@@ -76,6 +110,9 @@ exports.getAnnouncementsForStaff = async (req, res) => {
           blocks: a.blocks,
           publishAt: a.publishAt,
           expiresAt: a.expiresAt,
+          startsAt: a.startsAt,
+          endsAt: a.endsAt,
+          alertPhase: alertPhase(a),
           createdAt: a.createdAt,
           readCount,
           audienceCount: total,
@@ -107,9 +144,14 @@ exports.createAnnouncement = async (req, res) => {
       ? String(req.body.status).toUpperCase()
       : 'DRAFT';
 
+    const windowValues = parseAlertWindow(req.body);
+    if (windowValues.error) return res.status(400).json({ error: windowValues.error });
+
     const announcement = await Announcement.create({
       title,
       body,
+      startsAt: windowValues.startsAt || null,
+      endsAt: windowValues.endsAt || null,
       category,
       status,
       residenceId: req.body?.residenceId ? String(req.body.residenceId) : null,
@@ -153,6 +195,11 @@ exports.updateAnnouncement = async (req, res) => {
     if (req.body?.publishAt !== undefined) updates.publishAt = req.body.publishAt ? new Date(req.body.publishAt) : null;
     if (req.body?.expiresAt !== undefined) updates.expiresAt = req.body.expiresAt ? new Date(req.body.expiresAt) : null;
 
+    const windowValues = parseAlertWindow(req.body, announcement);
+    if (windowValues.error) return res.status(400).json({ error: windowValues.error });
+    if ('startsAt' in windowValues) updates.startsAt = windowValues.startsAt;
+    if ('endsAt' in windowValues) updates.endsAt = windowValues.endsAt;
+
     await announcement.update(updates);
     res.json(announcement);
   } catch (err) {
@@ -183,7 +230,7 @@ exports.deleteAnnouncement = async (req, res) => {
 // @route   GET /api/announcements
 exports.getMyAnnouncements = async (req, res) => {
   try {
-    const owner = await Owner.findOne({ where: { email: req.user.email } });
+    const owner = await Owner.findOne({ where: { email: await getEffectiveResidentEmail(req.user) } });
 
     const where = {
       status: { [Op.in]: ['PUBLISHED', 'SCHEDULED'] },
@@ -212,6 +259,10 @@ exports.getMyAnnouncements = async (req, res) => {
         body: a.body,
         category: a.category,
         publishAt: a.publishAt,
+        expiresAt: a.expiresAt,
+        startsAt: a.startsAt,
+        endsAt: a.endsAt,
+        alertPhase: alertPhase(a),
         createdAt: a.createdAt,
         isRead: readIds.has(a.id),
       }))

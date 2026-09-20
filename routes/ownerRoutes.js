@@ -8,7 +8,8 @@ const {
   updateOwner,
   updateOwnerStatus,
   deleteOwner,
-  resetOwnerPassword
+  resetOwnerPassword,
+  getOwnerAccount
 } = require('../controllers/ownerController');
 
 router.route('/')
@@ -22,6 +23,9 @@ router.route('/:id')
 
 router.route('/:id/status')
   .put(protect, authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER'), updateOwnerStatus);
+
+router.route('/:id/account')
+  .get(protect, authorizeRoles('ADMIN'), getOwnerAccount);
 
 router.route('/:id/reset-password')
   .post(protect, authorizeRoles('ADMIN'), resetOwnerPassword);

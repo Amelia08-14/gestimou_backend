@@ -1,4 +1,4 @@
-const { User, UserDevice } = require('../models');
+const { User, UserDevice, HouseholdMember } = require('../models');
 const bcrypt = require('bcryptjs');
 const { writeAuditLog } = require('../utils/auditLog');
 const crypto = require('crypto');
@@ -258,6 +258,50 @@ exports.resetUserDevices = async (req, res) => {
     res.json({ message: `Appareils réinitialisés (${deleted} supprimé(s)).`, devicesDeleted: deleted });
   } catch (err) {
     console.error('[resetUserDevices]', err);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Deactivate / reactivate an account (e.g. a suspicious one)
+// @route   PUT /api/users/:id/status   body: { isActive: boolean, includeHousehold?: boolean }
+exports.setUserStatus = async (req, res) => {
+  try {
+    if (typeof req.body?.isActive !== 'boolean') {
+      return res.status(400).json({ error: 'isActive (booléen) requis.' });
+    }
+    const isActive = req.body.isActive;
+
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (user.id === req.user.id && !isActive) {
+      return res.status(400).json({ error: 'Vous ne pouvez pas désactiver votre propre compte.' });
+    }
+
+    const affected = [user];
+    if (req.body?.includeHousehold === true) {
+      const members = await User.findAll({ where: { householdOwnerId: user.id } });
+      affected.push(...members);
+    }
+
+    for (const target of affected) {
+      await target.update({ isActive });
+      // A deactivated account also frees its registered devices.
+      if (!isActive) await UserDevice.destroy({ where: { userId: target.id } });
+    }
+
+    await writeAuditLog({
+      req,
+      action: isActive ? 'Réactivation compte' : 'Désactivation compte',
+      details: `${isActive ? 'Compte réactivé' : 'Compte désactivé'}: ${affected.map((u) => u.email).join(', ')}`,
+      user: req.user,
+      meta: { userIds: affected.map((u) => u.id), isActive },
+    });
+
+    const json = user.toJSON();
+    delete json.password;
+    res.json({ ...json, affectedCount: affected.length });
+  } catch (err) {
+    console.error('[setUserStatus]', err?.message);
     res.status(500).json({ error: 'Server Error' });
   }
 };

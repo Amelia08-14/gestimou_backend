@@ -36,6 +36,16 @@ const Announcement = sequelize.define('Announcement', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  // Optional time window of the alert itself (e.g. a water cut 09:00 -> 12:00),
+  // distinct from publishAt/expiresAt which only control visibility.
+  startsAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  endsAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
   createdByUserId: {
     type: DataTypes.INTEGER,
     allowNull: true,

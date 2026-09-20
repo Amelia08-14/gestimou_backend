@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { Op } = require('sequelize');
-const { Document, Residence } = require('../models');
+const { Document, Residence, Property, Owner } = require('../models');
+const { getEffectiveResidentEmail } = require('../utils/residentScope');
 
 const allowedMimeTypes = new Set([
   'application/pdf',
@@ -54,6 +55,46 @@ const safeJoinUploads = (urlPath) => {
   return path.join(__dirname, '..', 'uploads', 'documents', filename);
 };
 
+const getResidentResidenceIds = async (user) => {
+  const email = await getEffectiveResidentEmail(user);
+  if (!email) return [];
+  const properties = await Property.findAll({
+    attributes: ['residenceId'],
+    include: [{ model: Owner, as: 'owner', required: true, where: { email }, attributes: [] }],
+  });
+  return Array.from(new Set(properties.map((p) => String(p.residenceId)).filter(Boolean)));
+};
+
+// @desc    Administration documents published to residents (mobile "Documents")
+// @route   GET /api/documents/resident
+exports.getResidentDocuments = async (req, res) => {
+  try {
+    const residenceIds = await getResidentResidenceIds(req.user);
+    const where = {
+      visibleToResidents: true,
+      [Op.or]: [{ residenceId: null }, ...(residenceIds.length ? [{ residenceId: { [Op.in]: residenceIds } }] : [])],
+    };
+    const documents = await Document.findAll({
+      where,
+      include: [{ model: Residence, attributes: ['id', 'name'] }],
+      order: [['category', 'ASC'], ['createdAt', 'DESC']],
+    });
+    res.json(documents.map((d) => ({
+      id: d.id,
+      name: d.name,
+      type: d.type,
+      size: d.size,
+      category: d.category,
+      residenceId: d.residenceId,
+      residenceName: d.Residence?.name || null,
+      createdAt: d.createdAt,
+    })));
+  } catch (err) {
+    console.error('[Document] resident list error:', err?.message);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    List documents (optionally filter by category, residenceId, search)
 // @route   GET /api/documents
 exports.getDocuments = async (req, res) => {
@@ -84,6 +125,7 @@ exports.getDocuments = async (req, res) => {
 exports.createDocument = async (req, res) => {
   try {
     const { name, category, residenceId, dataUrl } = req.body || {};
+    const visibleToResidents = req.body?.visibleToResidents === true || String(req.body?.visibleToResidents).toLowerCase() === 'true';
     if (!category) return res.status(400).json({ error: 'Missing fields' });
 
     let filename = null;
@@ -127,6 +169,7 @@ exports.createDocument = async (req, res) => {
       name: String(name || req.file?.originalname || filename),
       category: String(category),
       residenceId: residenceId ? String(residenceId) : null,
+      visibleToResidents,
       type: ext.toUpperCase(),
       size: formatSize(byteLength),
       url: `/uploads/documents/${filename}`
@@ -149,6 +192,12 @@ exports.downloadDocument = async (req, res) => {
     const document = await Document.findByPk(req.params.id);
     if (!document) return res.status(404).json({ error: 'Document not found' });
     if (!document.url) return res.status(404).json({ error: 'Document file missing' });
+
+    if (req.user?.role === 'RESIDENT') {
+      const residenceIds = await getResidentResidenceIds(req.user);
+      const inScope = !document.residenceId || residenceIds.includes(String(document.residenceId));
+      if (!document.visibleToResidents || !inScope) return res.status(403).json({ error: 'Forbidden' });
+    }
 
     const filePath = safeJoinUploads(document.url);
     if (!filePath) return res.status(400).json({ error: 'Invalid document path' });

@@ -1,6 +1,11 @@
+const fs = require('fs');
+const path = require('path');
 const { Op } = require('sequelize');
-const { MaintenanceTicket, Subcontractor, User, Notification, Residence, Property, Owner } = require('../models');
+const { MaintenanceTicket, Subcontractor, User, Notification, Residence, Property, Owner, TicketAttachment, TicketHistory } = require('../models');
 const { writeAuditLog } = require('../utils/auditLog');
+const { getEffectiveResidentEmail, getEffectiveResidentUser } = require('../utils/residentScope');
+const { recordTicketHistory } = require('../utils/ticketHistory');
+const { MAX_TICKET_ATTACHMENTS, MAX_TICKET_ATTACHMENTS_BYTES } = require('../middleware/uploadMiddleware');
 
 const isAllZones = (zone) => String(zone || '').trim().toUpperCase() === 'ALL';
 
@@ -114,6 +119,37 @@ const getResidentResidenceIds = async (email) => {
   return Array.from(new Set(properties.map((p) => p.residenceId).filter(Boolean)));
 };
 
+const serializeAttachment = (a) => ({
+  id: a.id,
+  url: a.url,
+  name: a.name,
+  type: a.type,
+  size: a.size,
+  createdAt: a.createdAt,
+});
+
+// Always exposes `attachments` (array). Tickets that only carry the legacy
+// single attachmentUrl column get it surfaced as one entry.
+const withAttachments = (ticket) => {
+  const json = typeof ticket.toJSON === 'function' ? ticket.toJSON() : { ...ticket };
+  const rows = Array.isArray(json.attachments) ? json.attachments : [];
+  if (rows.length) {
+    json.attachments = rows.map(serializeAttachment);
+  } else if (json.attachmentUrl) {
+    json.attachments = [{
+      id: `legacy-${json.id}`,
+      url: json.attachmentUrl,
+      name: json.attachmentName || null,
+      type: json.attachmentType || null,
+      size: json.attachmentSize || 0,
+      createdAt: json.createdAt,
+    }];
+  } else {
+    json.attachments = [];
+  }
+  return json;
+};
+
 exports.getMaintenanceCategories = async (req, res) => {
   res.json({ success: true, data: PROBLEM_TYPES });
 };
@@ -126,10 +162,13 @@ const canAccessTicket = async (user, ticketId) => {
   if (!user) return { ok: false, status: 401, error: 'Not authorized' };
 
   if (user.role === 'RESIDENT') {
-    const ownTicket = ticket.email && user.email && ticket.email.toLowerCase() === user.email.toLowerCase();
+    // Household members share the primary resident's tickets (see residentScope).
+    const residentEmail = await getEffectiveResidentEmail(user);
+    const ticketEmail = String(ticket.email || '').toLowerCase();
+    const ownTicket = ticketEmail && (ticketEmail === residentEmail || ticketEmail === String(user.email || '').toLowerCase());
     if (!ownTicket) {
       // Pour les tickets de copropriété
-      const residenceIds = await getResidentResidenceIds(user.email);
+      const residenceIds = await getResidentResidenceIds(residentEmail);
       const isCopro = isCoproTicketCategory(ticket.category);
       const isPersonal = isPersonalIssueType(ticket.title);
       
@@ -168,17 +207,18 @@ exports.getTickets = async (req, res) => {
     
     // Filtering for Residents: Only show their own tickets
     if (req.user && req.user.role === 'RESIDENT') {
+        const residentEmail = await getEffectiveResidentEmail(req.user);
         const scope = String(req.query.scope || '').trim().toLowerCase();
         if (scope === 'residence') {
           const residenceId = String(req.query.residenceId || '').trim();
-          const residenceIds = await getResidentResidenceIds(req.user.email);
+          const residenceIds = await getResidentResidenceIds(residentEmail);
           if (!residenceId || !residenceIds.includes(residenceId)) {
             return res.status(403).json({ error: 'Forbidden' });
           }
           where.residenceId = residenceId;
           where.title = { [Op.notLike]: "%TAG d'accès%" };
         } else {
-          where.email = req.user.email;
+          where.email = residentEmail;
         }
     }
 
@@ -210,13 +250,14 @@ exports.getTickets = async (req, res) => {
     // Attempt to include Subcontractor safely
     // Since Subcontractor is defined in index.js, it should work if the table exists
     include.push({ model: Subcontractor, as: 'subcontractor', required: false });
+    include.push({ model: TicketAttachment, as: 'attachments', required: false, separate: true, order: [['createdAt', 'ASC']] });
 
     const tickets = await MaintenanceTicket.findAll({
       where,
       order: [['createdAt', 'DESC']],
       include: include
     });
-    res.json(tickets);
+    res.json(tickets.map(withAttachments));
   } catch (err) {
     res.status(500).json({ error: 'Server Error' });
   }
@@ -230,9 +271,11 @@ exports.getTicket = async (req, res) => {
     if (!access.ok) return res.status(access.status).json({ error: access.error });
     const ticket = access.ticket;
     const subcontractor = await Subcontractor.findByPk(ticket.subcontractorId).catch(() => null);
+    const attachments = await TicketAttachment.findAll({ where: { ticketId: ticket.id }, order: [['createdAt', 'ASC']] });
     const json = ticket.toJSON();
+    json.attachments = attachments;
     json.subcontractor = subcontractor || null;
-    res.json(json);
+    res.json(withAttachments(json));
   } catch (err) {
     res.status(500).json({ error: 'Server Error' });
   }
@@ -264,11 +307,17 @@ exports.createTicket = async (req, res) => {
     const rawDescription = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
     const safeDescription = rawDescription.slice(0, 100);
 
+    // Tickets raised by a household member belong to the primary resident's
+    // unit, so they are stored under the primary resident's e-mail.
+    const ticketEmail = req.user
+      ? (req.user.role === 'RESIDENT' ? await getEffectiveResidentEmail(req.user) : req.user.email)
+      : req.body.email;
+
     const ticketData = {
         ...req.body,
         title: normalizeTicketTitle(req.body.title),
         description: safeDescription,
-        email: req.user ? req.user.email : req.body.email,
+        email: ticketEmail,
         requester: req.user ? req.user.name : (req.body.requester || 'Anonyme')
     };
 
@@ -281,7 +330,8 @@ exports.createTicket = async (req, res) => {
     }
 
     const ticket = await MaintenanceTicket.create(ticketData);
-    
+    await recordTicketHistory({ ticketId: ticket.id, action: 'CREATED', toStatus: ticket.status, actor: req.user });
+
     const createdResidence = residence || (ticket.residenceId ? await Residence.findByPk(ticket.residenceId) : null);
 
     // Notification for requester confirmation
@@ -482,6 +532,30 @@ exports.updateTicket = async (req, res) => {
 
     const after = { status: ticket.status, assignee: ticket.assignee, subcontractorId: ticket.subcontractorId, responsible: ticket.responsible };
 
+    if (before.status !== after.status) {
+      await recordTicketHistory({
+        ticketId: ticket.id,
+        action: 'STATUS_CHANGED',
+        fromStatus: before.status,
+        toStatus: after.status,
+        note: after.status === 'Rejeté' ? ticket.rejectionReason : null,
+        actor: req.user,
+      });
+    }
+    if (
+      before.assignee !== after.assignee ||
+      String(before.subcontractorId || '') !== String(after.subcontractorId || '') ||
+      before.responsible !== after.responsible
+    ) {
+      const assignedTo = after.assignee || after.responsible || (ticket.subcontractorId ? 'un intervenant' : null);
+      await recordTicketHistory({
+        ticketId: ticket.id,
+        action: 'ASSIGNED',
+        note: assignedTo ? `Affecté à ${assignedTo}` : 'Affectation retirée',
+        actor: req.user,
+      });
+    }
+
     // Notify requester when status changes
     if (before.status !== after.status && ticket.email) {
       const normalizedEmail = String(ticket.email || '').trim().toLowerCase();
@@ -569,34 +643,182 @@ exports.deleteTicket = async (req, res) => {
   }
 };
 
-// @desc    Upload ticket attachment (single file, max 2MB)
+const removeUploadedFiles = (files = []) => {
+  for (const file of files) {
+    const filePath = file?.path || (file?.filename ? path.join(__dirname, '..', 'uploads', 'tickets', file.filename) : null);
+    if (filePath) fs.promises.unlink(filePath).catch(() => null);
+  }
+};
+
+// Shared by the multi-file endpoint and the legacy single-file one.
+// Rules: at most MAX_TICKET_ATTACHMENTS files per ticket, MAX_TICKET_ATTACHMENTS_BYTES in total.
+const attachFilesToTicket = async (req, res, files) => {
+  const access = await canAccessTicket(req.user, req.params.id);
+  if (!access.ok) {
+    removeUploadedFiles(files);
+    return res.status(access.status).json({ error: access.error });
+  }
+  const ticket = access.ticket;
+
+  if (!files.length) return res.status(400).json({ error: 'Aucun fichier fourni.' });
+
+  const existing = await TicketAttachment.findAll({ where: { ticketId: ticket.id } });
+  const existingCount = existing.length;
+  const existingBytes = existing.reduce((sum, a) => sum + (a.size || 0), 0);
+  const incomingBytes = files.reduce((sum, f) => sum + (f.size || 0), 0);
+
+  if (existingCount + files.length > MAX_TICKET_ATTACHMENTS) {
+    removeUploadedFiles(files);
+    return res.status(400).json({ error: `${MAX_TICKET_ATTACHMENTS} pièces jointes maximum par ticket.` });
+  }
+  if (existingBytes + incomingBytes > MAX_TICKET_ATTACHMENTS_BYTES) {
+    removeUploadedFiles(files);
+    return res.status(413).json({ error: 'Les pièces jointes ne doivent pas dépasser 10 Mo au total.' });
+  }
+
+  const created = [];
+  for (const file of files) {
+    created.push(await TicketAttachment.create({
+      ticketId: ticket.id,
+      url: `/uploads/tickets/${file.filename}`,
+      name: file.originalname,
+      type: file.mimetype,
+      size: file.size,
+      uploadedByUserId: req.user.id,
+    }));
+  }
+
+  // Keep the legacy single-attachment columns pointing at the first file so
+  // older admin-web screens still show a link.
+  if (!ticket.attachmentUrl) {
+    await ticket.update({
+      attachmentUrl: created[0].url,
+      attachmentName: created[0].name,
+      attachmentType: created[0].type,
+      attachmentSize: created[0].size,
+    });
+  }
+
+  await recordTicketHistory({
+    ticketId: ticket.id,
+    action: 'ATTACHMENT_ADDED',
+    note: `${created.length} pièce(s) jointe(s) ajoutée(s)`,
+    actor: req.user,
+  });
+
+  await writeAuditLog({
+    req,
+    action: 'Pièce jointe ticket',
+    details: `${created.length} pièce(s) jointe(s) uploadée(s): ${ticket.title}`,
+    user: req.user,
+    meta: { ticketId: ticket.id, files: created.map((a) => ({ name: a.name, size: a.size })) }
+  });
+
+  const all = await TicketAttachment.findAll({ where: { ticketId: ticket.id }, order: [['createdAt', 'ASC']] });
+  return res.status(201).json({ attachments: all.map(serializeAttachment) });
+};
+
+// @desc    Upload ticket attachments (up to 4 files, 10 MB in total)
+// @route   POST /api/maintenance/:id/attachments   (multipart field "files")
+exports.uploadTicketAttachments = async (req, res) => {
+  try {
+    await attachFilesToTicket(req, res, req.files || []);
+  } catch (err) {
+    removeUploadedFiles(req.files || []);
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// @desc    Legacy single-file upload (multipart field "file"), kept for older clients
 // @route   POST /api/maintenance/:id/attachment
 exports.uploadTicketAttachment = async (req, res) => {
+  try {
+    await attachFilesToTicket(req, res, req.file ? [req.file] : []);
+  } catch (err) {
+    removeUploadedFiles(req.file ? [req.file] : []);
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// @desc    Delete one attachment of a ticket (uploader or staff)
+// @route   DELETE /api/maintenance/:id/attachments/:attachmentId
+exports.deleteTicketAttachment = async (req, res) => {
+  try {
+    const access = await canAccessTicket(req.user, req.params.id);
+    if (!access.ok) return res.status(access.status).json({ error: access.error });
+
+    const attachment = await TicketAttachment.findOne({
+      where: { id: req.params.attachmentId, ticketId: access.ticket.id },
+    });
+    if (!attachment) return res.status(404).json({ error: 'Pièce jointe introuvable.' });
+
+    // Staff can remove any file; residents only files uploaded from their own
+    // household (themselves, the primary resident or another member).
+    const isStaff = ['ADMIN', 'RESPONSABLE_ZONE', 'MANAGER'].includes(req.user.role);
+    if (!isStaff) {
+      const uploader = attachment.uploadedByUserId ? await User.findByPk(attachment.uploadedByUserId) : null;
+      const householdOf = async (u) => (u ? (await getEffectiveResidentUser(u)).id : null);
+      const sameHousehold = uploader && (await householdOf(uploader)) === (await householdOf(req.user));
+      if (!sameHousehold) return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const filePath = path.join(__dirname, '..', 'uploads', 'tickets', path.basename(attachment.url));
+    await attachment.destroy();
+    fs.promises.unlink(filePath).catch(() => null);
+
+    res.json({ message: 'Pièce jointe supprimée.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Processing history of a ticket (creation, status changes, assignments...)
+// @route   GET /api/maintenance/:id/history
+exports.getTicketHistory = async (req, res) => {
   try {
     const access = await canAccessTicket(req.user, req.params.id);
     if (!access.ok) return res.status(access.status).json({ error: access.error });
     const ticket = access.ticket;
 
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
-
-    const publicUrl = `/uploads/tickets/${req.file.filename}`;
-    await ticket.update({
-      attachmentUrl: publicUrl,
-      attachmentName: req.file.originalname,
-      attachmentType: req.file.mimetype,
-      attachmentSize: req.file.size,
+    const rows = await TicketHistory.findAll({
+      where: { ticketId: ticket.id },
+      order: [['createdAt', 'ASC'], ['id', 'ASC']],
     });
 
-    await writeAuditLog({
-      req,
-      action: 'Pièce jointe ticket',
-      details: `Pièce jointe uploadée: ${ticket.title}`,
-      user: req.user,
-      meta: { ticketId: ticket.id, attachmentName: req.file.originalname, size: req.file.size }
-    });
+    let items = rows.map((r) => r.toJSON());
 
-    res.json(ticket);
+    // Tickets that pre-date the history feature: rebuild a minimal timeline.
+    if (!items.length) {
+      items.push({ id: 'created', action: 'CREATED', toStatus: 'Signalé', createdAt: ticket.createdAt, actorRole: 'RESIDENT' });
+      if (ticket.status && ticket.status !== 'Signalé') {
+        items.push({ id: 'current', action: 'STATUS_CHANGED', fromStatus: 'Signalé', toStatus: ticket.status, createdAt: ticket.updatedAt, actorRole: null });
+      }
+    }
+
+    const viewerIsResident = req.user.role === 'RESIDENT';
+    items = items.map((item) => ({
+      id: item.id,
+      action: item.action,
+      fromStatus: item.fromStatus || null,
+      toStatus: item.toStatus || null,
+      // Residents see who acted only by role, never staff names or assignee details.
+      note: viewerIsResident && item.action === 'ASSIGNED' ? null : (item.note || null),
+      actorRole: item.actorRole || null,
+      actorName: viewerIsResident && item.actorRole !== 'RESIDENT' ? null : (item.actorName || null),
+      createdAt: item.createdAt,
+    }));
+
+    // Start / end of the treatment, derived from the status transitions.
+    const firstInProgress = items.find((i) => i.toStatus === 'En cours');
+    const closing = [...items].reverse().find((i) => i.toStatus === 'Terminé' || i.toStatus === 'Rejeté');
+
+    res.json({
+      history: items,
+      startedAt: firstInProgress ? firstInProgress.createdAt : null,
+      closedAt: closing && ['Terminé', 'Rejeté'].includes(ticket.status) ? closing.createdAt : null,
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('[Ticket] history error:', err?.message);
+    res.status(500).json({ error: 'Server Error' });
   }
 };

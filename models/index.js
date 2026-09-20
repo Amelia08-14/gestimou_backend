@@ -20,6 +20,8 @@ const HouseholdMember = require('./HouseholdMember');
 const Message = require('./Message');
 const Announcement = require('./Announcement');
 const AnnouncementRead = require('./AnnouncementRead');
+const TicketAttachment = require('./TicketAttachment');
+const TicketHistory = require('./TicketHistory');
 
 // Define Associations
 
@@ -114,6 +116,12 @@ AnnouncementRead.belongsTo(Announcement, { foreignKey: 'announcementId', as: 'an
 User.hasMany(AnnouncementRead, { foreignKey: 'userId', as: 'announcementReads' });
 AnnouncementRead.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// MaintenanceTicket <-> TicketAttachment / TicketHistory
+MaintenanceTicket.hasMany(TicketAttachment, { foreignKey: 'ticketId', as: 'attachments', constraints: false });
+TicketAttachment.belongsTo(MaintenanceTicket, { foreignKey: 'ticketId', as: 'ticket', constraints: false });
+MaintenanceTicket.hasMany(TicketHistory, { foreignKey: 'ticketId', as: 'history', constraints: false });
+TicketHistory.belongsTo(MaintenanceTicket, { foreignKey: 'ticketId', as: 'ticket', constraints: false });
+
 module.exports = {
   User,
   Property,
@@ -137,4 +145,6 @@ module.exports = {
   Message,
   Announcement,
   AnnouncementRead,
+  TicketAttachment,
+  TicketHistory,
 };

@@ -1,0 +1,613 @@
+{
+  "_source": "Site Aymen Promotion Immobilière (aymen-immobilier-v3: data/mockData.ts + i18n/locales). Généré une fois; éditer à la main ensuite.",
+  "amenityCatalog": {
+    "climatisation": {
+      "fr": "Climatisation Centralisée",
+      "en": "Centralized Air Conditioning",
+      "ar": "تكييف مركزي"
+    },
+    "reception": {
+      "fr": "Réception",
+      "en": "Reception Lobby",
+      "ar": "استقبال"
+    },
+    "bache_eau": {
+      "fr": "Bâche à Eau",
+      "en": "Water Tank",
+      "ar": "خزان ماء"
+    },
+    "ascenseur": {
+      "fr": "Ascenseur",
+      "en": "Elevator",
+      "ar": "مصعد"
+    },
+    "cuisine": {
+      "fr": "Cuisine Équipée",
+      "en": "Equipped Kitchen",
+      "ar": "مطبخ مجهز"
+    },
+    "groupe_electrogene": {
+      "fr": "Groupe Électrogène",
+      "en": "Generator",
+      "ar": "مولد كهربائي"
+    },
+    "parking": {
+      "fr": "Parking de Stationnement",
+      "en": "Parking",
+      "ar": "موقف سيارات"
+    },
+    "domotique": {
+      "fr": "Domotique",
+      "en": "Home Automation",
+      "ar": "منزل ذكي"
+    },
+    "dressing": {
+      "fr": "Dressing",
+      "en": "Dressing Room",
+      "ar": "غرفة ملابس"
+    },
+    "isolation_phonique": {
+      "fr": "Isolation Phonique",
+      "en": "Sound Insulation",
+      "ar": "عزل صوتي"
+    },
+    "aire_jeux": {
+      "fr": "Aire de Jeux",
+      "en": "Playground",
+      "ar": "ملعب أطفال"
+    },
+    "piscine_commune": {
+      "fr": "Piscine Commune",
+      "en": "Shared Pool",
+      "ar": "مسبح مشترك"
+    },
+    "piscine_privative": {
+      "fr": "Piscine Privative",
+      "en": "Private Pool",
+      "ar": "مسبح خاص"
+    },
+    "fenetre": {
+      "fr": "Fenêtres Double Vitrage",
+      "en": "Double Glazed Windows",
+      "ar": "نوافذ مزدوجة"
+    },
+    "salle_eau": {
+      "fr": "Salle d'Eau",
+      "en": "Bathroom",
+      "ar": "حمام"
+    },
+    "salle_sport": {
+      "fr": "Salle de Sport",
+      "en": "Gym",
+      "ar": "صالة رياضية"
+    },
+    "spa": {
+      "fr": "Spa / Hammam / Sauna",
+      "en": "Spa / Hammam / Sauna",
+      "ar": "سبا / حمام / ساونا"
+    },
+    "gestion_copropriete": {
+      "fr": "Gestion Copropriété",
+      "en": "Co-ownership Management",
+      "ar": "إدارة الملكية المشتركة"
+    },
+    "creche": {
+      "fr": "Crèche / Garderie",
+      "en": "Nursery / Daycare",
+      "ar": "حضانة"
+    }
+  },
+  "residences": {
+    "ALTHEA": {
+      "title": "ALTHEA",
+      "location": "Chevalley, Alger",
+      "description": "C’est à Chevalley, quartier résidentiel prisé, qu’Aymen Promotion Immobilière présente la résidence Althéa, une adresse conçue pour offrir confort, sérénité et accessibilité.",
+      "amenities": [
+        "climatisation",
+        "reception",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "groupe_electrogene"
+      ]
+    },
+    "CYANITE": {
+      "title": "CYANITE",
+      "location": "Chéraga, Alger",
+      "description": "Fort du succès de notre première résidence Pyrite, nous repoussons encore les limites du raffinement avec la résidence Cyanite, une nouvelle adresse prestigieuse au cœur du mythique quartier de Dar Diaf.",
+      "amenities": [
+        "piscine_privative",
+        "isolation_phonique",
+        "dressing",
+        "domotique",
+        "reception",
+        "parking",
+        "aire_jeux",
+        "climatisation"
+      ]
+    },
+    "AZURITE": {
+      "title": "AZURITE",
+      "location": "Kouba, Alger",
+      "description": "La résidence Azurite, située dans le quartier mythique de Kouba, offre un cadre de vie privilégié, à proximité immédiate de l’université, des commerces et des restaurants prisés.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique"
+      ]
+    },
+    "AGATE": {
+      "title": "AGATE",
+      "location": "Oued Romane, Alger",
+      "description": "Située à Oued Romane (El Achour), un quartier calme et verdoyant, la résidence offre un cadre de vie paisible, propice à la sérénité. Cette résidence contemporaine se compose de deux blocs regroupant 67 appartements aux typologies variées : F2, F3, F4, F5 et duplex.",
+      "amenities": [
+        "climatisation",
+        "aire_jeux",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique"
+      ]
+    },
+    "AMETRINE": {
+      "title": "AMÉTRINE",
+      "location": "Said Hamdine, Alger",
+      "description": "Résidence Amétrine , le récent chef-d'œuvre d'Aymen Promotion Immobilière, se distingue par son caractère intimiste et son emplacement privilégié à Saïd Hamdine, dans la commune de Bir Mourad Raïs.",
+      "amenities": [
+        "climatisation",
+        "aire_jeux",
+        "parking",
+        "reception",
+        "dressing",
+        "isolation_phonique",
+        "piscine_commune",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete"
+      ]
+    },
+    "CORNALINE": {
+      "title": "CORNALINE",
+      "location": "Hydra, Alger",
+      "description": "Érigée au cœur de la commune de Hydra, la résidence Cornaline dévoile ses atouts de caractère dans un cadre propice au développement et à la relaxation.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "SERAPHINITE": {
+      "title": "SÉRAPHINITE",
+      "location": "Ruisseau, Alger",
+      "description": "C’est à Ruisseau, quartier prisé des Algérois, qu’Aymen Promotion Immobilière a choisi d’implanter son nouveau joyau immobilier : la résidence Séraphinite.",
+      "amenities": [
+        "climatisation",
+        "aire_jeux",
+        "parking",
+        "reception",
+        "dressing",
+        "isolation_phonique",
+        "piscine_commune",
+        "salle_sport",
+        "piscine_privative",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "CELESTINE": {
+      "title": "CÉLESTINE",
+      "location": "Bab Ezzouar, Alger",
+      "description": "Aymen Promotion Immobilière lance son premier projet dans la commune dynamique de Bab Ezzouar !",
+      "amenities": [
+        "climatisation",
+        "aire_jeux",
+        "parking",
+        "reception",
+        "dressing",
+        "isolation_phonique",
+        "piscine_commune",
+        "salle_sport",
+        "piscine_privative",
+        "bache_eau",
+        "ascenseur",
+        "creche",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "LARIMAR": {
+      "title": "LARIMAR",
+      "location": "Birkhadem, Alger",
+      "description": "Idéalement située à Tixeraïne, Birkhadem, la résidence Larimar est une perle rare qui émerge en réponse au succès retentissant de la résidence Aymen, également située à Tixeraïne.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "SELENITE": {
+      "title": "SELENITE",
+      "location": "Birkhadem, Alger",
+      "description": "Conçue pour allier esthétisme et fonctionnalité, la résidence one building Sélénite incarne le summum de la modernité. Cet édifice élégant se positionne judicieusement dans la commune affectionnée de Birkhadem.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "DIAR EL AMANE": {
+      "title": "DIAR EL AMANE",
+      "location": "Birkhadem, Alger",
+      "description": "Connue autrefois pour ses champs d’arbres fruitiers à perte de vue, la région des Vergers à Birkhadem connaît depuis quelque temps une croissance importante.",
+      "amenities": [
+        "climatisation",
+        "aire_jeux",
+        "parking",
+        "reception",
+        "dressing",
+        "isolation_phonique",
+        "piscine_commune",
+        "salle_sport",
+        "piscine_privative",
+        "spa",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "PYRITE": {
+      "title": "PYRITE",
+      "location": "Chéraga, Alger",
+      "description": "Située à Dar Diaf, au cœur de la commune dynamique de Chéraga, la résidence Haut Standing Pyrite s'étend sur 3 blocs et propose une large variété de logements d'exception. Ce projet innovant donne sur les accès autoroutiers, facilitant grandement les déplacements des résidents.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "JAIS": {
+      "title": "JAIS",
+      "location": "Draria, Alger",
+      "description": "La résidence Jais, véritable joyau d’Aymen Promotion Immobilière, incarne le calme et la sophistication à l’état pur et offre une multitude d'aménagements pour un cadre de vie des plus confortables.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "LES CRETES": {
+      "title": "LES CRÊTES",
+      "location": "Draria, Alger",
+      "description": "Au cœur d'un des quartiers les plus prestigieux de la commune de Draria, se dévoile la somptueuse Résidence Les Crêtes. Présentant un design moderne et raffiné, cette résidence se distingue par ses façades ornées de magnifiques angles vitrés.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "TURQUOISE": {
+      "title": "TURQUOISE",
+      "location": "Les Sources, Alger",
+      "description": "Aymen Promotion Immobilière détient l'art subtil de créer des résidences raffinées et intimistes. Parmi ces créations prestigieuses, se trouve la résidence Turquoise, un véritable havre de paix niché au cœur des Sources à Alger.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "BOIS DES CARS": {
+      "title": "BOIS DES CARS",
+      "location": "Dely Ibrahim, Alger",
+      "description": "La résidence Bois des Cars, sise à Dely Ibrahim, représente un projet exclusif et sophistiqué de la société Aymen Promotion Immobilière. Ce projet propose une gamme d'appartements spacieux, allant du F3 de 105 m² au F5 en duplex dépassant les 160 m².",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "PERIDOT": {
+      "title": "PÉRIDOT",
+      "location": "Hydra, Alger",
+      "description": "Raffinée et discrète, la résidence Péridot d'Aymen Promotion Immobilière représente un véritable refuge de tranquillité, niché au cœur de la prestigieuse commune d'Hydra.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "CORAIL": {
+      "title": "CORAIL",
+      "location": "Hydra, Alger",
+      "description": "Découvrez la résidence Corail, un véritable bijou immobilier au cœur de Hydra !",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "OPALE": {
+      "title": "OPALE",
+      "location": "El Achour, Alger",
+      "description": "Plongez au cœur de la résidence Opale d’Aymen Promotion Immobilière, là où confort, modernité et sécurité se marient joliment.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "CITRINE": {
+      "title": "CITRINE",
+      "location": "Birkhadem, Alger",
+      "description": "Plongez au cœur de la résidence Opale d’Aymen Promotion Immobilière, là où confort, modernité et sécurité se marient joliment.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "salle_sport",
+        "spa",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "ANGELITE": {
+      "title": "ANGÉLITE",
+      "location": "Dar El Beida, Alger",
+      "description": "Découvrez la splendeur de la Résidence Angélite, un bijou de l'immobilier signé Aymen Promotion, situé dans la charmante commune de Dar El Beïda.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "RUBIS": {
+      "title": "RUBIS",
+      "location": "El Achour, Alger",
+      "description": "Véritable bijou de la promotion immobilière Aymen, la résidence Rubis se situe au niveau de la commune de Oued Romane, dans un quartier à caractère résidentiel, calme et sécurisé.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "ONYX": {
+      "title": "ONYX",
+      "location": "Oued Romane, Alger",
+      "description": "Aymen Promotion Immobilière, reconnue pour ses résidences haut standing, tient une fois de plus sa promesse de qualité avec la résidence Onyx, située à Oued Romane. Cette somptueuse résidence achevée se compose de deux blocs, proposant une qualité de vie supérieure à ses résidents.",
+      "amenities": [
+        "reception",
+        "domotique",
+        "climatisation",
+        "aire_jeux"
+      ]
+    },
+    "EL MORDJANE": {
+      "title": "EL MORDJANE",
+      "location": "Said Hamdine, Alger",
+      "description": "Au cœur d'Alger, dans le quartier de Saïd Hamdine, à quelques pas de la prestigieuse rue Sidi Yahia, se dresse fièrement la résidence El Mordjane d’Aymen Promotion Immobilière.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "AYMEN": {
+      "title": "Aymen",
+      "location": "Birkhadem, Alger",
+      "description": "Située à proximité de la petite ville Birkhadem, plus précisément à Tixeraïne, la résidence Aymen se distingue en tant que projet emblématique ayant marqué le début de l'aventure d’Aymen Promotion Immobilière.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "creche",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    },
+    "COQUELICOT": {
+      "title": "COQUELICOT",
+      "location": "Hydra, Alger",
+      "description": "Découvrez le nouvel opus urbain exceptionnel d’Aymen Promotion Immobilière, pour un style de vie luxueux et des prestations de qualité supérieure !",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique"
+      ]
+    },
+    "PERLA": {
+      "title": "PERLA",
+      "location": "Dar El Beida, Alger",
+      "description": "Qui ne rêve pas de la quiétude et de la tranquillité que propose le projet phare d’ Aymen Promotion Immobilière : Perla.",
+      "amenities": [
+        "climatisation",
+        "parking",
+        "reception",
+        "domotique",
+        "dressing",
+        "isolation_phonique",
+        "bache_eau",
+        "ascenseur",
+        "cuisine",
+        "fenetre",
+        "groupe_electrogene",
+        "gestion_copropriete",
+        "salle_eau"
+      ]
+    }
+  }
+}

@@ -1,4 +1,5 @@
 const { Property, Owner, Residence } = require('../models');
+const { getEffectiveResidentEmail } = require('../utils/residentScope');
 
 // @desc    Get all properties
 // @route   GET /api/properties
@@ -11,7 +12,8 @@ exports.getProperties = async (req, res) => {
     ];
 
     if (req.user?.role === 'RESIDENT') {
-      include[0] = { model: Owner, as: 'owner', required: true, where: { email: req.user.email } };
+      const residentEmail = await getEffectiveResidentEmail(req.user);
+      include[0] = { model: Owner, as: 'owner', required: true, where: { email: residentEmail } };
     }
 
     if (req.user?.role === 'RESPONSABLE_ZONE') {
@@ -50,7 +52,8 @@ exports.getProperty = async (req, res) => {
 
     if (req.user?.role === 'RESIDENT') {
       const email = property.owner?.email;
-      if (!email || email !== req.user.email) return res.status(403).json({ success: false, error: 'Forbidden' });
+      const residentEmail = await getEffectiveResidentEmail(req.user);
+      if (!email || String(email).toLowerCase() !== residentEmail) return res.status(403).json({ success: false, error: 'Forbidden' });
     }
 
     if (req.user?.role === 'RESPONSABLE_ZONE') {

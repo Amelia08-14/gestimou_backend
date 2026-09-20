@@ -46,6 +46,24 @@ const User = sequelize.define('User', {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  // Optional profile picture: /uploads/avatars/xxx.jpg
+  photo: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  // Admin kill-switch for suspicious accounts. Inactive users can't log in
+  // and every authenticated request is refused (see authMiddleware.protect).
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+  },
+  // Set on accounts created through a resident's household: points at the
+  // primary resident's User.id, whose properties/tickets/charges they share.
+  householdOwnerId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 }, {
   timestamps: true,
   tableName: 'User', // Explicit table name to match Prisma (Prisma uses pascalCase or whatever map is set, usually matches model name)

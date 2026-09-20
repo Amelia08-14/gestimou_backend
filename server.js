@@ -35,32 +35,6 @@ app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(morgan('dev'));
 
-app.use((err, req, res, next) => {
-  if (err && err.type === 'entity.too.large') {
-    const origin = req.headers.origin;
-    if (origin) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Vary', 'Origin');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-
-    return res.status(413).json({ error: 'Payload Too Large' });
-  }
-
-  if (err && err.name === 'MulterError') {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ error: 'File too large' });
-    }
-    return res.status(400).json({ error: 'Upload error' });
-  }
-
-  if (err && err.message === 'Unsupported file type') {
-    return res.status(400).json({ error: 'Unsupported file type' });
-  }
-
-  return next(err);
-});
-
 app.get('/', (req, res) => {
   res.send('API is running...');
 });
@@ -92,11 +66,22 @@ const messageRoutes = require('./routes/messageRoutes');
 const announcementRoutes = require('./routes/announcementRoutes');
 const { startAnnualChargesScheduler } = require('./jobs/annualChargesScheduler');
 
+// Adds missing columns to an existing table (safe: only adds, never alters/drops).
+const ensureColumns = async (table, columns) => {
+  const { sequelize } = require('./config/db');
+  const existing = await sequelize.getQueryInterface().describeTable(table);
+  for (const [name, definition] of Object.entries(columns)) {
+    if (!existing[name]) {
+      await sequelize.getQueryInterface().addColumn(table, name, definition);
+      console.log(`${table}.${name} column added.`);
+    }
+  }
+};
+
 const ensureMaintenanceTicketColumns = async () => {
   const { sequelize } = require('./config/db');
   const { DataTypes } = require('sequelize');
-  const table = await sequelize.getQueryInterface().describeTable('MaintenanceTicket');
-  const columns = {
+  await ensureColumns('MaintenanceTicket', {
     responsible: { type: DataTypes.STRING, allowNull: true },
     subcontractorId: { type: DataTypes.UUID, allowNull: true },
     interventionDate: { type: DataTypes.DATE, allowNull: true },
@@ -112,14 +97,7 @@ const ensureMaintenanceTicketColumns = async () => {
     attachmentType: { type: DataTypes.STRING, allowNull: true },
     attachmentSize: { type: DataTypes.INTEGER, allowNull: true },
     rejectionReason: { type: DataTypes.STRING, allowNull: true },
-  };
-
-  for (const [name, definition] of Object.entries(columns)) {
-    if (!table[name]) {
-      await sequelize.getQueryInterface().addColumn('MaintenanceTicket', name, definition);
-      console.log(`MaintenanceTicket.${name} column added.`);
-    }
-  }
+  });
 
   await sequelize.query(
     'UPDATE `MaintenanceTicket` SET `title` = :nextTitle WHERE `title` IN (:oldTitles)',
@@ -130,6 +108,34 @@ const ensureMaintenanceTicketColumns = async () => {
       },
     }
   );
+};
+
+// Columns added for the resident-app evolutions (profile photo, household
+// accounts, resident documents, ticket info messages, alert window, amenities).
+const ensureResidentAppColumns = async () => {
+  const { DataTypes } = require('sequelize');
+  await ensureColumns('User', {
+    photo: { type: DataTypes.STRING, allowNull: true },
+    isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    householdOwnerId: { type: DataTypes.INTEGER, allowNull: true },
+  });
+  await ensureColumns('HouseholdMember', {
+    email: { type: DataTypes.STRING, allowNull: true },
+    linkedUserId: { type: DataTypes.INTEGER, allowNull: true },
+  });
+  await ensureColumns('Document', {
+    visibleToResidents: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+  });
+  await ensureColumns('Message', {
+    kind: { type: DataTypes.STRING, allowNull: false, defaultValue: 'CHAT' },
+  });
+  await ensureColumns('Announcement', {
+    startsAt: { type: DataTypes.DATE, allowNull: true },
+    endsAt: { type: DataTypes.DATE, allowNull: true },
+  });
+  await ensureColumns('Residence', {
+    amenities: { type: DataTypes.TEXT, allowNull: true },
+  });
 };
 
 // Mount routers
@@ -156,6 +162,32 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/', passwordResetPageRoutes);
 
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+
+    return res.status(413).json({ error: 'Payload Too Large' });
+  }
+
+  if (err && err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'File too large' });
+    }
+    return res.status(400).json({ error: 'Upload error' });
+  }
+
+  if (err && err.message === 'Unsupported file type') {
+    return res.status(400).json({ error: 'Unsupported file type' });
+  }
+
+  return next(err);
+});
+
 const PORT = process.env.PORT || 5000;
 
 (async () => {
@@ -163,7 +195,7 @@ const PORT = process.env.PORT || 5000;
 
   // Ensure tables added after initial DB sync exist (safe: only creates, never drops)
   try {
-    const { PropertyAddRequest, UserDevice, AuditLog, Tag, PasswordResetToken, HouseholdMember, Message, Announcement, AnnouncementRead } = require('./models');
+    const { PropertyAddRequest, UserDevice, AuditLog, Tag, PasswordResetToken, HouseholdMember, Message, Announcement, AnnouncementRead, TicketAttachment, TicketHistory } = require('./models');
     await Promise.all([
       PropertyAddRequest.sync(),
       UserDevice.sync(),
@@ -175,7 +207,9 @@ const PORT = process.env.PORT || 5000;
       Announcement.sync(),
     ]);
     await AnnouncementRead.sync();
+    await Promise.all([TicketAttachment.sync(), TicketHistory.sync()]);
     await ensureMaintenanceTicketColumns();
+    await ensureResidentAppColumns();
     console.log('Model tables verified/created.');
   } catch (e) {
     console.warn('Warning: table sync on startup failed:', e.message);

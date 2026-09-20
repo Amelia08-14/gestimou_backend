@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Owner, Property, Residence, User, Notification } = require('../models');
+const { Owner, Property, Residence, User, Notification, HouseholdMember } = require('../models');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
@@ -295,6 +295,42 @@ L'équipe Gestimou.`;
       meta: { ownerId: owner.id, resetUserId: user.id, emailSent }
     });
   } catch (err) {
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Login account of an owner + the household accounts attached to it
+// @route   GET /api/owners/:id/account
+exports.getOwnerAccount = async (req, res) => {
+  try {
+    const owner = await Owner.findByPk(req.params.id);
+    if (!owner) return res.status(404).json({ error: 'Owner not found' });
+
+    const email = String(owner.email || '').trim().toLowerCase();
+    const user = email ? await User.findOne({ where: { email }, attributes: ['id', 'email', 'isActive', 'role'] }) : null;
+
+    const members = user
+      ? await HouseholdMember.findAll({ where: { userId: user.id }, order: [['createdAt', 'ASC']] })
+      : [];
+    const linkedIds = members.map((m) => m.linkedUserId).filter(Boolean);
+    const linkedUsers = linkedIds.length
+      ? await User.findAll({ where: { id: { [Op.in]: linkedIds } }, attributes: ['id', 'isActive'] })
+      : [];
+    const activeById = new Map(linkedUsers.map((u) => [u.id, u.isActive !== false]));
+
+    res.json({
+      user: user ? { id: user.id, email: user.email, isActive: user.isActive !== false } : null,
+      household: members.map((m) => ({
+        id: m.id,
+        fullName: m.fullName,
+        email: m.email,
+        relation: m.relation,
+        userId: m.linkedUserId,
+        isActive: m.linkedUserId ? (activeById.get(m.linkedUserId) ?? true) : null,
+      })),
+    });
+  } catch (err) {
+    console.error('[getOwnerAccount]', err?.message);
     res.status(500).json({ error: 'Server Error' });
   }
 };
