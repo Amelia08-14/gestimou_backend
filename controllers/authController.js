@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { writeAuditLog } = require('../utils/auditLog');
 const { saveImageDataUrl, removeUploadedImage } = require('../utils/mediaUpload');
+const { MAX_DEVICES, listActiveDevices } = require('../utils/deviceLimit');
 
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 
@@ -49,42 +50,34 @@ exports.login = async (req, res) => {
     }
 
     // --- Device Management (For Residents) ---
+    // Only the mobile app sends a deviceId; a resident logging in without one
+    // (older app version) is not subject to the limit.
+    let tokenDeviceId = null;
     if (user.role === 'RESIDENT' && deviceId) {
-        // Check if device is already registered
-        let device = await UserDevice.findOne({ 
-            where: { userId: user.id, deviceId } 
-        });
+        tokenDeviceId = String(deviceId).trim();
+        // Idle devices are released first so they never count against the limit.
+        const devices = await listActiveDevices(user.id);
+        const device = devices.find((d) => d.deviceId === tokenDeviceId);
 
         if (device) {
-            // Update last active
             await device.update({ lastActive: new Date(), deviceName: deviceName || device.deviceName });
+        } else if (devices.length >= MAX_DEVICES) {
+            return res.status(403).json({
+                error: `Limite d'appareils atteinte (${MAX_DEVICES}/${MAX_DEVICES}). Veuillez contacter l'administration pour réinitialiser vos appareils.`,
+                code: 'DEVICE_LIMIT_REACHED',
+            });
         } else {
-            // Check limit (3 devices)
-            const deviceCount = await UserDevice.count({ where: { userId: user.id } });
-            if (deviceCount >= 3) {
-                return res.status(403).json({ 
-                    error: 'Limite d\'appareils atteinte (3/3). Veuillez contacter l\'administration pour réinitialiser vos appareils.' 
-                });
-            }
-
-            // Register new device
             await UserDevice.create({
                 userId: user.id,
-                deviceId,
+                deviceId: tokenDeviceId,
                 deviceName: deviceName || 'Unknown Device'
             });
         }
-    } else if (user.role === 'RESIDENT' && !deviceId) {
-        // If it's a resident logging in without deviceId (e.g. from web, if allowed, or older app version)
-        // Ideally we enforce deviceId for mobile app.
-        // For now, let's allow web login without device check if they are resident? 
-        // Or assume this is web login if no deviceId.
-        // If the requirement "application mobile... seulement sur 03 appareils" applies to mobile app only.
     }
-    
-    // Generate Token
+
+    // Generate Token (`did` lets the API keep this device's last activity fresh)
     const token = jwt.sign(
-      { id: user.id, role: user.role },
+      { id: user.id, role: user.role, ...(tokenDeviceId ? { did: tokenDeviceId } : {}) },
       process.env.JWT_SECRET || 'secret',
       { expiresIn: '30d' }
     );

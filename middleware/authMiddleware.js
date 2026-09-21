@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const { touchDevice } = require('../utils/deviceLimit');
 
 const extractBearerToken = (authorization) => {
   const raw = String(authorization || '').trim();
@@ -33,6 +34,9 @@ const protect = async (req, res, next) => {
         code: 'ACCOUNT_DISABLED',
       });
     }
+
+    // Keep the device's "last seen" fresh so only unused devices expire.
+    touchDevice(req.user.id, decoded.did);
 
     return next();
   } catch (error) {

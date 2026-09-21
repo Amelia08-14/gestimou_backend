@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { writeAuditLog } = require('../utils/auditLog');
+const { MAX_DEVICES, listActiveDevices } = require('../utils/deviceLimit');
 
 let cachedTransporter = null;
 let cachedTransporterKey = null;
@@ -318,8 +319,20 @@ exports.getOwnerAccount = async (req, res) => {
       : [];
     const activeById = new Map(linkedUsers.map((u) => [u.id, u.isActive !== false]));
 
+    // Devices counted against each account's limit (idle ones are released here too).
+    const devicesOf = async (userId) => {
+      if (!userId) return [];
+      const rows = await listActiveDevices(userId);
+      return rows.map((d) => ({ id: d.id, name: d.deviceName || 'Appareil', lastActive: d.lastActive }));
+    };
+    const devicesByUser = new Map();
+    for (const id of [user?.id, ...linkedIds].filter(Boolean)) devicesByUser.set(id, await devicesOf(id));
+
     res.json({
-      user: user ? { id: user.id, email: user.email, isActive: user.isActive !== false } : null,
+      maxDevices: MAX_DEVICES,
+      user: user
+        ? { id: user.id, email: user.email, isActive: user.isActive !== false, devices: devicesByUser.get(user.id) }
+        : null,
       household: members.map((m) => ({
         id: m.id,
         fullName: m.fullName,
@@ -327,6 +340,7 @@ exports.getOwnerAccount = async (req, res) => {
         relation: m.relation,
         userId: m.linkedUserId,
         isActive: m.linkedUserId ? (activeById.get(m.linkedUserId) ?? true) : null,
+        devices: m.linkedUserId ? devicesByUser.get(m.linkedUserId) : null,
       })),
     });
   } catch (err) {
