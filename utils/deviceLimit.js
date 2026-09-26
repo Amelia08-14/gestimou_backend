@@ -1,8 +1,12 @@
 const { Op } = require('sequelize');
 const { UserDevice } = require('../models');
 
-// A resident account may be signed in on at most MAX_DEVICES phones.
-const MAX_DEVICES = 3;
+// A resident account may be signed in on at most MAX_DEVICES phones. The limit
+// is per account: each household member has their own login and their own quota.
+// Overridable with MAX_RESIDENT_DEVICES (no redeploy of code needed).
+const MAX_DEVICES = Number.parseInt(process.env.MAX_RESIDENT_DEVICES, 10) > 0
+  ? Number.parseInt(process.env.MAX_RESIDENT_DEVICES, 10)
+  : 10;
 
 // A session lasts 30 days (see authController), so a device that has not been
 // seen for that long no longer holds a valid session: it stops counting.

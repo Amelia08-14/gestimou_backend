@@ -63,14 +63,15 @@ exports.login = async (req, res) => {
             await device.update({ lastActive: new Date(), deviceName: deviceName || device.deviceName });
         } else if (devices.length >= MAX_DEVICES) {
             return res.status(403).json({
-                error: `Limite d'appareils atteinte (${MAX_DEVICES}/${MAX_DEVICES}). Veuillez contacter l'administration pour réinitialiser vos appareils.`,
+                error: "Limite d'appareils atteinte. Veuillez contacter l'administration pour réinitialiser vos appareils.",
                 code: 'DEVICE_LIMIT_REACHED',
             });
         } else {
-            await UserDevice.create({
-                userId: user.id,
-                deviceId: tokenDeviceId,
-                deviceName: deviceName || 'Unknown Device'
+            // One row per (account, device): findOrCreate stays safe if two logins
+            // from the same new device arrive at the same time.
+            await UserDevice.findOrCreate({
+                where: { userId: user.id, deviceId: tokenDeviceId },
+                defaults: { deviceName: deviceName || 'Unknown Device' }
             });
         }
     }
