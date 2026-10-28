@@ -43,10 +43,12 @@ router.route('/:id/attachment')
   );
 
 // Up to 4 files / 10 MB total per ticket (multipart field "files").
+// The intervenant adds the photos of their work; canAccessTicket keeps them
+// to their own tickets.
 router.route('/:id/attachments')
   .post(
     protect,
-    authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'RESIDENT'),
+    authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'INTERVENANT', 'RESIDENT'),
     handleUpload(ticketUpload.array('files', MAX_TICKET_ATTACHMENTS)),
     uploadTicketAttachments
   );
@@ -54,7 +56,7 @@ router.route('/:id/attachments')
 router.route('/:id/attachments/:attachmentId')
   .delete(
     protect,
-    authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'RESIDENT'),
+    authorizeRoles('ADMIN', 'RESPONSABLE_ZONE', 'MANAGER', 'INTERVENANT', 'RESIDENT'),
     deleteTicketAttachment
   );
 

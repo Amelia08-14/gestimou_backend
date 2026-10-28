@@ -222,14 +222,16 @@ exports.getTickets = async (req, res) => {
         }
     }
 
-    // Filtering for Intervenants: Only show tickets assigned to them
+    // Filtering for Intervenants: Only show tickets assigned to them, either
+    // by name (picked from the staff accounts) or through the subcontractor
+    // record sharing their e-mail — the same two ways canAccessTicket allows.
     if (req.user && req.user.role === 'INTERVENANT') {
         const sub = await Subcontractor.findOne({ where: { email: req.user.email } });
-        if (sub) {
-            where.subcontractorId = sub.id;
-        } else {
-            return res.json([]); // No subcontractor profile found for this user
-        }
+        const mine = [];
+        if (req.user.name) mine.push({ assignee: req.user.name });
+        if (sub) mine.push({ subcontractorId: sub.id });
+        if (!mine.length) return res.json([]);
+        where[Op.or] = mine;
     }
 
     // Filtering for Zone Managers: Only show tickets for their zone
@@ -275,6 +277,15 @@ exports.getTicket = async (req, res) => {
     const json = ticket.toJSON();
     json.attachments = attachments;
     json.subcontractor = subcontractor || null;
+    // Staff and the intervenant on site can call the requester; residents
+    // never see another household's number.
+    if (req.user.role !== 'RESIDENT' && ticket.email) {
+      const owner = await Owner.findOne({
+        where: { email: String(ticket.email).trim().toLowerCase() },
+        attributes: ['phone'],
+      }).catch(() => null);
+      json.requesterPhone = owner?.phone || null;
+    }
     res.json(withAttachments(json));
   } catch (err) {
     res.status(500).json({ error: 'Server Error' });
@@ -414,17 +425,36 @@ exports.updateTicket = async (req, res) => {
 
     const patch = {};
 
+    // An intervenant moves their own job forward and nothing else: they start
+    // it ("En cours") and declare it done ("Terminé"), with an optional
+    // report kept in the ticket history. Every other field is ignored.
+    const isIntervenant = user?.role === 'INTERVENANT';
+    let statusNote = null;
+    if (isIntervenant) {
+      const next = req.body?.status;
+      const current = String(ticket.status || '').trim();
+      const moves = { 'En cours': ['Signalé', 'SAV'], 'Terminé': ['En cours', 'SAV'] };
+      if (typeof next !== 'string' || !moves[next]) {
+        return res.status(403).json({ error: 'Un intervenant peut uniquement démarrer ou terminer une intervention' });
+      }
+      if (!moves[next].includes(current)) {
+        return res.status(400).json({ error: `Ce ticket est « ${current} » : impossible de le passer à « ${next} »` });
+      }
+      const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+      if (note.length > 1000) {
+        return res.status(400).json({ error: 'Compte rendu trop long (1000 caractères maximum).' });
+      }
+      statusNote = note || null;
+      req.body = { status: next };
+    }
+
     // Role-based status restrictions
     if (typeof req.body?.status === 'string') {
       const newStatus = req.body.status;
 
-      // INTERVENANT can only set status to "En cours"
-      if (user.role === 'INTERVENANT' && newStatus !== 'En cours') {
-        return res.status(403).json({ error: 'Un intervenant peut uniquement mettre le statut à "En cours"' });
-      }
-
-      // Only ADMIN or RESPONSABLE_ZONE can set status to "Terminé"
-      if (newStatus === 'Terminé' && user.role !== 'ADMIN' && user.role !== 'RESPONSABLE_ZONE') {
+      // Only ADMIN or RESPONSABLE_ZONE can set status to "Terminé" — or the
+      // intervenant doing the job, checked above.
+      if (newStatus === 'Terminé' && !isIntervenant && user.role !== 'ADMIN' && user.role !== 'RESPONSABLE_ZONE') {
         return res.status(403).json({ error: 'Seul un administrateur ou responsable de zone peut clôturer un ticket' });
       }
 
@@ -530,6 +560,19 @@ exports.updateTicket = async (req, res) => {
         }
     }
 
+    // Assigned by name to a staff intervenant account: tell them too.
+    if (ticket.assignee && ticket.assignee !== before.assignee) {
+      const assignedUser = await User.findOne({ where: { name: ticket.assignee, role: 'INTERVENANT' } });
+      if (assignedUser) {
+        await Notification.create({
+          userId: assignedUser.id,
+          title: 'Nouvelle tâche assignée',
+          message: `Le ticket "${ticket.title}" vous a été assigné.`,
+          type: 'INFO'
+        });
+      }
+    }
+
     const after = { status: ticket.status, assignee: ticket.assignee, subcontractorId: ticket.subcontractorId, responsible: ticket.responsible };
 
     if (before.status !== after.status) {
@@ -538,7 +581,7 @@ exports.updateTicket = async (req, res) => {
         action: 'STATUS_CHANGED',
         fromStatus: before.status,
         toStatus: after.status,
-        note: after.status === 'Rejeté' ? ticket.rejectionReason : null,
+        note: after.status === 'Rejeté' ? ticket.rejectionReason : statusNote,
         actor: req.user,
       });
     }
@@ -753,7 +796,8 @@ exports.deleteTicketAttachment = async (req, res) => {
     if (!attachment) return res.status(404).json({ error: 'Pièce jointe introuvable.' });
 
     // Staff can remove any file; residents only files uploaded from their own
-    // household (themselves, the primary resident or another member).
+    // household (themselves, the primary resident or another member), and an
+    // intervenant only their own photos (they have no household).
     const isStaff = ['ADMIN', 'RESPONSABLE_ZONE', 'MANAGER'].includes(req.user.role);
     if (!isStaff) {
       const uploader = attachment.uploadedByUserId ? await User.findByPk(attachment.uploadedByUserId) : null;
